@@ -91,7 +91,7 @@ export default function HomePage({ onOpenQuoteModal }) {
       <section className="relative overflow-hidden pt-0 pb-6 md:pt-0 md:pb-10 bg-gradient-to-b from-cefi-cream via-cefi-cream to-white">
         
         {/* Faint botanical leaf watermark - left side */}
-        <div className="absolute left-0 bottom-0 w-[480px] h-auto opacity-80 pointer-events-none select-none z-0" aria-hidden="true">
+        <div className="absolute left-0 bottom-0 w-48 md:w-[480px] h-auto opacity-80 pointer-events-none select-none z-0" aria-hidden="true">
           <img src="/images/leaf-watermark.png" alt="" className="w-full h-full object-contain object-bottom-left" />
         </div>
 
@@ -159,15 +159,15 @@ export default function HomePage({ onOpenQuoteModal }) {
             </div>
 
             {/* Right Column: Hero Graphic Composition */}
-            <div className="lg:col-span-7 relative flex items-center justify-center h-[620px] sm:h-[800px] lg:h-[920px]">
+            <div className="lg:col-span-7 relative flex items-center justify-center h-[320px] sm:h-[500px] lg:h-[920px]">
               
               {/* Main Hero Feature Image */}
               <div className="relative w-full h-full z-10 flex justify-center items-center overflow-visible">
                 <img
                   src="/images/hero-image.png"
                   alt="Ceylon Spices & Natural Products"
-                  className="w-full h-full object-contain drop-shadow-2xl hover:scale-105 transition-transform duration-700"
-                  style={{ maxHeight: '920px', transform: 'scale(1.38)' }}
+                  className="w-full h-full object-contain drop-shadow-2xl hover:scale-110 transition-transform duration-700 scale-110 md:scale-125 lg:scale-[1.38] origin-center"
+                  style={{ maxHeight: '920px' }}
                 />
               </div>
 
