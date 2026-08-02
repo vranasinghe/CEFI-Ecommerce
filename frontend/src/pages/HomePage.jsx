@@ -150,8 +150,8 @@ export default function HomePage({ onOpenQuoteModal }) {
               <img src="/icon-truck.png" alt="Delivery Icon" className="w-8 h-8 object-contain transition-all duration-300 group-hover:brightness-0 group-hover:invert" />
             </div>
             <div>
-              <h4 className="font-sans font-bold text-cefi-earth text-[13px] md:text-sm transition-colors group-hover:text-cefi-green">Island-Wide Delivery</h4>
-              <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">Fresh products delivered across Sri Lanka.</p>
+              <h4 className="font-sans font-bold text-cefi-earth text-[13px] md:text-sm transition-colors group-hover:text-cefi-green">Worldwide Delivery</h4>
+              <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">Fresh products delivered across the globe.</p>
             </div>
           </div>
 
