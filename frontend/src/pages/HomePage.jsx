@@ -72,6 +72,23 @@ export default function HomePage({ onOpenQuoteModal }) {
       {/* 2. Hero Section */}
       <section className="relative overflow-hidden pt-2 pb-8 md:pt-4 md:pb-16 bg-gradient-to-b from-cefi-cream via-cefi-cream to-white">
         
+        {/* Faint botanical leaf watermark - left side */}
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-64 h-64 opacity-[0.07] pointer-events-none select-none" aria-hidden="true">
+          <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+            <path d="M100 180 C60 160 20 120 30 70 C40 20 90 10 120 30 C150 50 170 100 150 140 C130 170 100 180 100 180Z" fill="#1F532E" />
+            <path d="M100 180 L100 50" stroke="#1F532E" strokeWidth="2"/>
+            <path d="M100 120 C80 100 60 95 50 80" stroke="#1F532E" strokeWidth="1.5"/>
+            <path d="M100 100 C120 80 140 78 150 65" stroke="#1F532E" strokeWidth="1.5"/>
+            <path d="M100 140 C75 125 55 118 45 102" stroke="#1F532E" strokeWidth="1.5"/>
+          </svg>
+        </div>
+        <div className="absolute left-8 bottom-8 w-40 h-40 opacity-[0.05] pointer-events-none select-none rotate-45" aria-hidden="true">
+          <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+            <path d="M100 180 C60 160 20 120 30 70 C40 20 90 10 120 30 C150 50 170 100 150 140 C130 170 100 180 100 180Z" fill="#1F532E" />
+            <path d="M100 180 L100 50" stroke="#1F532E" strokeWidth="2"/>
+          </svg>
+        </div>
+
         {/* Decorative Floating Botanical Details */}
         <div className="absolute top-10 left-10 w-24 h-24 bg-cefi-gold/10 rounded-full blur-3xl pointer-events-none"></div>
         <div className="absolute bottom-10 right-10 w-48 h-48 bg-cefi-green/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -82,21 +99,33 @@ export default function HomePage({ onOpenQuoteModal }) {
             {/* Left Column: Typography & CTAs */}
             <div className="lg:col-span-5 space-y-6 z-10">
               
-              <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-cefi-gold/15 text-cefi-earth text-xs font-bold tracking-wide">
-                <Sparkles className="w-3.5 h-3.5 text-cefi-gold" />
-                <span>Pure Ceylon Single-Origin Excellence</span>
+              {/* Badge with leaf icon */}
+              <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full border border-cefi-green/30 bg-cefi-green/8 text-cefi-earth text-xs font-bold tracking-widest uppercase">
+                <svg className="w-3.5 h-3.5 text-cefi-green" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10 2C6 2 3 6 3 10c0 3 2 5.5 4.5 6.5L10 18l2.5-1.5C15 15.5 17 13 17 10c0-4-3-8-7-8z"/>
+                </svg>
+                <span className="text-cefi-green">Pure Ceylon Single-Origin Excellence</span>
               </div>
 
+              {/* Main Heading */}
               <h1 className="font-serif font-extrabold text-4xl sm:text-5xl lg:text-6xl text-cefi-earth leading-tight tracking-tight">
                 Rooted in Ceylon, <br />
                 <span className="text-cefi-green italic font-normal">Grown for the World.</span>
               </h1>
 
+              {/* Golden divider with leaf */}
+              <div className="flex items-center space-x-3">
+                <div className="h-px w-12 bg-cefi-gold"></div>
+                <svg className="w-5 h-5 text-cefi-gold" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10 2C6 2 3 6 3 10c0 3 2 5.5 4.5 6.5L10 18l2.5-1.5C15 15.5 17 13 17 10c0-4-3-8-7-8z"/>
+                </svg>
+              </div>
+
               <p className="text-base sm:text-lg text-cefi-earth/80 max-w-xl font-sans leading-relaxed">
                 Premium Sri Lankan tea, authentic True Cinnamon, rare spices, sun-dried tropical fruits, and organic agricultural produce processed and exported under world-class quality standards.
               </p>
 
-              <div className="pt-4 flex flex-wrap items-center gap-4">
+              <div className="pt-2 flex flex-wrap items-center gap-4">
                 <Link
                   to="/products"
                   className="px-8 py-4 bg-cefi-earth hover:bg-cefi-green text-white rounded-full font-serif font-semibold text-base shadow-lg hover:shadow-xl transition-all flex items-center space-x-3 group"
@@ -106,22 +135,29 @@ export default function HomePage({ onOpenQuoteModal }) {
                     <ArrowRight className="w-4 h-4" />
                   </div>
                 </Link>
-
-
               </div>
 
-              {/* Quick Trust Statistics */}
-              <div className="pt-8 grid grid-cols-3 gap-4 border-t border-cefi-cream-dark/60 max-w-lg">
-                <div>
-                  <span className="block font-serif font-bold text-2xl text-cefi-green">100%</span>
+              {/* Quick Trust Statistics with icons */}
+              <div className="pt-6 grid grid-cols-3 gap-4 border-t border-cefi-cream-dark/60 max-w-lg">
+                <div className="flex flex-col items-start space-y-1">
+                  <div className="w-8 h-8 rounded-full border border-cefi-green/30 flex items-center justify-center mb-1">
+                    <svg className="w-4 h-4 text-cefi-green" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2C6 2 3 6 3 10c0 3 2 5.5 4.5 6.5L10 18l2.5-1.5C15 15.5 17 13 17 10c0-4-3-8-7-8z"/></svg>
+                  </div>
+                  <span className="font-serif font-bold text-2xl text-cefi-green">100%</span>
                   <span className="text-xs text-gray-500 font-medium">Pure Ceylon Origin</span>
                 </div>
-                <div>
-                  <span className="block font-serif font-bold text-2xl text-cefi-green">40+</span>
+                <div className="flex flex-col items-start space-y-1">
+                  <div className="w-8 h-8 rounded-full border border-cefi-green/30 flex items-center justify-center mb-1">
+                    <svg className="w-4 h-4 text-cefi-green" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20"/></svg>
+                  </div>
+                  <span className="font-serif font-bold text-2xl text-cefi-green">40+</span>
                   <span className="text-xs text-gray-500 font-medium">Global Markets</span>
                 </div>
-                <div>
-                  <span className="block font-serif font-bold text-2xl text-cefi-green">300+</span>
+                <div className="flex flex-col items-start space-y-1">
+                  <div className="w-8 h-8 rounded-full border border-cefi-green/30 flex items-center justify-center mb-1">
+                    <svg className="w-4 h-4 text-cefi-green" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+                  </div>
+                  <span className="font-serif font-bold text-2xl text-cefi-green">300+</span>
                   <span className="text-xs text-gray-500 font-medium">Farmer Outgrowers</span>
                 </div>
               </div>
