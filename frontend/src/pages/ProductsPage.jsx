@@ -109,20 +109,7 @@ export default function ProductsPage({ onOpenQuoteModal }) {
 
         {/* Controls: Sort & Wholesale Toggle */}
         <div className="flex items-center space-x-3 shrink-0">
-          
-          {/* Wholesale Export Toggle */}
-          <button
-            onClick={() => setWholesaleOnly(!wholesaleOnly)}
-            className={`px-3.5 py-2 rounded-full text-xs font-bold transition-all flex items-center space-x-1.5 border ${
-              wholesaleOnly
-                ? 'bg-cefi-gold text-cefi-earth border-cefi-gold shadow-sm'
-                : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            <Globe className="w-3.5 h-3.5" />
-            <span>Export Bulk Only</span>
-            {wholesaleOnly && <Check className="w-3.5 h-3.5" />}
-          </button>
+
 
           {/* Sort Selector */}
           <div className="flex items-center space-x-2 bg-white px-3 py-1.5 rounded-full border border-gray-200 text-xs">
