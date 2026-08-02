@@ -51,29 +51,27 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// 🚀 Categories 🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀
+// ── Categories ───────────────────────────────────────────────────────────────
 app.get('/api/categories', async (req, res) => {
-  const desiredOrder = ['herbal-leaves', 'herbal-flowers', 'tea', 'spices', 'fruits', 'vegetables'];
-  
-  const sortCategories = (cats) => {
-    return cats.sort((a, b) => {
-      const idxA = desiredOrder.indexOf(a.slug);
-      const idxB = desiredOrder.indexOf(b.slug);
-      if (idxA === -1 && idxB === -1) return 0;
-      if (idxA === -1) return 1;
-      if (idxB === -1) return -1;
-      return idxA - idxB;
+  const order = ['herbal-leaves', 'herbal-flowers', 'tea', 'spices', 'fruits', 'vegetables'];
+  const sortData = (data) => {
+    return data.sort((a, b) => {
+      let indexA = order.indexOf(a.slug);
+      let indexB = order.indexOf(b.slug);
+      if (indexA === -1) indexA = 999;
+      if (indexB === -1) indexB = 999;
+      return indexA - indexB;
     });
   };
 
   try {
     if (supabase) {
       const { data, error } = await supabase.from('categories').select('*');
-      if (!error && data && data.length > 0) return res.json(sortCategories(data));
+      if (!error && data && data.length > 0) return res.json(sortData(data));
     }
-    return res.json(sortCategories([...mockData.categories]));
+    return res.json(sortData([...mockData.categories]));
   } catch (err) {
-    res.json(sortCategories([...mockData.categories]));
+    res.json(sortData([...mockData.categories]));
   }
 });
 
