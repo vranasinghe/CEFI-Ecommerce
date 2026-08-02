@@ -70,7 +70,7 @@ export default function HomePage({ onOpenQuoteModal }) {
     <div className="space-y-20 pb-16">
       
       {/* 2. Hero Section */}
-      <section className="relative overflow-hidden pt-8 pb-16 md:py-24 bg-gradient-to-b from-cefi-cream via-cefi-cream to-white">
+      <section className="relative overflow-hidden pt-2 pb-8 md:pt-4 md:pb-16 bg-gradient-to-b from-cefi-cream via-cefi-cream to-white">
         
         {/* Decorative Floating Botanical Details */}
         <div className="absolute top-10 left-10 w-24 h-24 bg-cefi-gold/10 rounded-full blur-3xl pointer-events-none"></div>
