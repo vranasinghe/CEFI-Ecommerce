@@ -70,82 +70,151 @@ export default function HomePage({ onOpenQuoteModal }) {
     <div className="space-y-20 pb-16">
       
       {/* 2. Hero Section */}
-      <section className="relative overflow-hidden pt-8 pb-16 md:py-24 bg-gradient-to-b from-cefi-cream via-cefi-cream to-white">
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#F5F3EE] via-[#F0EDE5] to-[#EAE6DC]" style={{ minHeight: '88vh' }}>
         
-        {/* Decorative Floating Botanical Details */}
-        <div className="absolute top-10 left-10 w-24 h-24 bg-cefi-gold/10 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="absolute bottom-10 right-10 w-48 h-48 bg-cefi-green/10 rounded-full blur-3xl pointer-events-none"></div>
+        {/* Subtle botanical background watermark */}
+        <div className="absolute inset-0 pointer-events-none opacity-5">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full border-[60px] border-cefi-green"></div>
+        </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center" style={{ minHeight: '88vh' }}>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 items-center w-full">
             
             {/* Left Column: Typography & CTAs */}
-            <div className="lg:col-span-5 space-y-6 z-10">
+            <div className="space-y-7 z-10 py-16 lg:py-0">
               
-              <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-cefi-gold/15 text-cefi-earth text-xs font-bold tracking-wide">
+              {/* Badge */}
+              <div className="inline-flex items-center space-x-2 px-4 py-2 rounded-full border border-cefi-gold/40 bg-white/60 text-cefi-earth text-xs font-bold tracking-widest uppercase backdrop-blur-sm">
                 <Sparkles className="w-3.5 h-3.5 text-cefi-gold" />
                 <span>Pure Ceylon Single-Origin Excellence</span>
               </div>
 
-              <h1 className="font-serif font-extrabold text-4xl sm:text-5xl lg:text-6xl text-cefi-earth leading-tight tracking-tight">
-                Rooted in Ceylon, <br />
-                <span className="text-cefi-green italic font-normal">Grown for the World.</span>
+              {/* Heading */}
+              <h1 className="font-serif font-extrabold text-5xl sm:text-6xl lg:text-7xl text-cefi-earth leading-[1.05] tracking-tight">
+                Rooted in Ceylon,<br />
+                <span className="text-cefi-green italic font-semibold">Grown for the</span><br />
+                <span className="text-cefi-green italic font-semibold">World.</span>
               </h1>
 
-              <p className="text-base sm:text-lg text-cefi-earth/80 max-w-xl font-sans leading-relaxed">
+              {/* Gold accent underline */}
+              <div className="flex items-center space-x-2">
+                <div className="w-12 h-0.5 bg-cefi-gold rounded-full"></div>
+                <div className="w-4 h-0.5 bg-cefi-gold/50 rounded-full"></div>
+              </div>
+
+              {/* Description */}
+              <p className="text-base text-cefi-earth/75 max-w-md font-sans leading-relaxed">
                 Premium Sri Lankan tea, authentic True Cinnamon, rare spices, sun-dried tropical fruits, and organic agricultural produce processed and exported under world-class quality standards.
               </p>
 
-              <div className="pt-4 flex flex-wrap items-center gap-4">
+              {/* CTA */}
+              <div className="pt-2">
                 <Link
                   to="/products"
-                  className="px-8 py-4 bg-cefi-earth hover:bg-cefi-green text-white rounded-full font-serif font-semibold text-base shadow-lg hover:shadow-xl transition-all flex items-center space-x-3 group"
+                  className="inline-flex items-center space-x-3 px-9 py-4 bg-cefi-earth hover:bg-cefi-green text-white rounded-full font-serif font-semibold text-base shadow-xl hover:shadow-2xl transition-all duration-300 group"
                 >
                   <span>Shop now</span>
-                  <div className="w-7 h-7 rounded-full bg-white/20 group-hover:bg-white text-white group-hover:text-cefi-green flex items-center justify-center transition-colors">
-                    <ArrowRight className="w-4 h-4" />
+                  <div className="w-8 h-8 rounded-full bg-white/20 group-hover:bg-white flex items-center justify-center transition-colors">
+                    <ArrowRight className="w-4 h-4 group-hover:text-cefi-green transition-colors" />
                   </div>
                 </Link>
-
-
               </div>
 
-              {/* Quick Trust Statistics */}
-              <div className="pt-8 grid grid-cols-3 gap-4 border-t border-cefi-cream-dark/60 max-w-lg">
-                <div>
-                  <span className="block font-serif font-bold text-2xl text-cefi-green">100%</span>
-                  <span className="text-xs text-gray-500 font-medium">Pure Ceylon Origin</span>
+              {/* Trust Stats with icons */}
+              <div className="pt-6 grid grid-cols-3 gap-6 border-t border-cefi-earth/10 max-w-md">
+                <div className="flex items-center space-x-3">
+                  <div className="w-9 h-9 rounded-full bg-cefi-green/10 flex items-center justify-center shrink-0">
+                    <Award className="w-4 h-4 text-cefi-green" />
+                  </div>
+                  <div>
+                    <span className="block font-serif font-bold text-xl text-cefi-earth">100%</span>
+                    <span className="text-[11px] text-gray-500 font-medium leading-tight">Pure Ceylon Origin</span>
+                  </div>
                 </div>
-                <div>
-                  <span className="block font-serif font-bold text-2xl text-cefi-green">40+</span>
-                  <span className="text-xs text-gray-500 font-medium">Global Markets</span>
+                <div className="flex items-center space-x-3">
+                  <div className="w-9 h-9 rounded-full bg-cefi-green/10 flex items-center justify-center shrink-0">
+                    <ShieldCheck className="w-4 h-4 text-cefi-green" />
+                  </div>
+                  <div>
+                    <span className="block font-serif font-bold text-xl text-cefi-earth">40+</span>
+                    <span className="text-[11px] text-gray-500 font-medium leading-tight">Global Markets</span>
+                  </div>
                 </div>
-                <div>
-                  <span className="block font-serif font-bold text-2xl text-cefi-green">300+</span>
-                  <span className="text-xs text-gray-500 font-medium">Farmer Outgrowers</span>
+                <div className="flex items-center space-x-3">
+                  <div className="w-9 h-9 rounded-full bg-cefi-green/10 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-4 h-4 text-cefi-green" />
+                  </div>
+                  <div>
+                    <span className="block font-serif font-bold text-xl text-cefi-earth">300+</span>
+                    <span className="text-[11px] text-gray-500 font-medium leading-tight">Farmer Outgrowers</span>
+                  </div>
                 </div>
               </div>
-
             </div>
 
-            {/* Right Column: Hero Graphic Composition */}
-            <div className="lg:col-span-7 relative flex items-center justify-center h-[480px] sm:h-[600px] lg:h-[680px]">
-              
-              {/* Main Hero Feature Image */}
-              <div className="relative w-full h-full z-10 flex justify-center items-center">
+            {/* Right Column: Large Hero Image with Floating Elements */}
+            <div className="relative flex items-center justify-center" style={{ minHeight: '88vh' }}>
+
+              {/* Floating ingredient: top-center (cinnamon/spices) */}
+              <img
+                src="/images/cat-spices.png"
+                alt=""
+                className="absolute top-8 left-1/2 -translate-x-1/2 w-20 h-20 object-contain drop-shadow-lg rotate-12 opacity-90 animate-bounce"
+                style={{ animationDuration: '4s', animationDelay: '0s' }}
+                aria-hidden="true"
+              />
+
+              {/* Floating ingredient: top-right (herbs/flowers) */}
+              <img
+                src="/images/cat-herbal-flowers.png"
+                alt=""
+                className="absolute top-12 right-0 w-28 h-28 object-contain drop-shadow-lg -rotate-6 opacity-90"
+                style={{ animation: 'float 5s ease-in-out infinite', animationDelay: '1s' }}
+                aria-hidden="true"
+              />
+
+              {/* Floating ingredient: bottom-right (ginger/turmeric) */}
+              <img
+                src="/images/cat-herbal.png"
+                alt=""
+                className="absolute bottom-16 right-2 w-24 h-24 object-contain drop-shadow-lg rotate-6 opacity-90"
+                style={{ animation: 'float 6s ease-in-out infinite', animationDelay: '2s' }}
+                aria-hidden="true"
+              />
+
+              {/* Floating ingredient: bottom-left (fruits) */}
+              <img
+                src="/images/cat-fruits.png"
+                alt=""
+                className="absolute bottom-12 left-0 w-20 h-20 object-contain drop-shadow-lg -rotate-12 opacity-90"
+                style={{ animation: 'float 5.5s ease-in-out infinite', animationDelay: '0.5s' }}
+                aria-hidden="true"
+              />
+
+              {/* Main Hero Image — large and centered */}
+              <div className="relative z-10 w-full flex items-center justify-center px-4">
                 <img
                   src="/images/hero-image.png"
                   alt="Ceylon Spices & Natural Products"
-                  className="w-full h-full object-contain drop-shadow-2xl hover:scale-105 transition-transform duration-700"
-                  style={{ maxHeight: '660px', transform: 'scale(1.08)' }}
+                  className="w-full object-contain drop-shadow-2xl transition-transform duration-700 hover:scale-[1.03]"
+                  style={{ maxWidth: '680px', maxHeight: '75vh' }}
                 />
               </div>
 
             </div>
-
           </div>
         </div>
+
+        {/* Float keyframe via inline style tag */}
+        <style>{`
+          @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(var(--rot, 0deg)); }
+            50% { transform: translateY(-14px) rotate(var(--rot, 0deg)); }
+          }
+        `}</style>
+
       </section>
+
 
       {/* 2.5 Features / Trust Badges */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-10 relative z-30">
