@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ChevronLeft, ChevronRight, Award, ShieldCheck, Truck, RefreshCw, Send, CheckCircle2, Sparkles } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ChevronRight, Award, ShieldCheck, Truck, RefreshCw, Send, CheckCircle2, Sparkles, CreditCard, Headset } from 'lucide-react';
 import CategoryCard from '../components/CategoryCard';
 import ProductCard from '../components/ProductCard';
+import Reveal from '../components/Reveal';
 
 export default function HomePage({ onOpenQuoteModal }) {
   const [categories, setCategories] = useState([]);
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [categoryScrollIndex, setCategoryScrollIndex] = useState(0);
+  const [carouselDirection, setCarouselDirection] = useState('right');
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
 
@@ -42,12 +44,14 @@ export default function HomePage({ onOpenQuoteModal }) {
 
   const nextCategory = () => {
     if (categories.length > 0) {
+      setCarouselDirection('right');
       setCategoryScrollIndex((prev) => (prev + 1) % categories.length);
     }
   };
 
   const prevCategory = () => {
     if (categories.length > 0) {
+      setCarouselDirection('left');
       setCategoryScrollIndex((prev) => (prev - 1 + categories.length) % categories.length);
     }
   };
@@ -119,33 +123,15 @@ export default function HomePage({ onOpenQuoteModal }) {
 
             </div>
 
-            {/* Right Column: Hero Graphic Composition (Matching Reference Bowl + Floating Product Shots) */}
-            <div className="lg:col-span-5 relative flex items-center justify-center">
+            {/* Right Column: Hero Graphic Composition */}
+            <div className="lg:col-span-5 relative flex items-center justify-center h-[400px] sm:h-[500px]">
               
-              {/* Floating Product Shot 1: Cinnamon / Cashew Top Left */}
-              <div className="absolute -top-6 -left-6 z-20 w-28 h-28 rounded-2xl overflow-hidden shadow-xl border-4 border-white animate-float">
+              {/* Main Bowl Feature Image */}
+              <div className="relative w-96 h-96 sm:w-[450px] sm:h-[450px] z-10 animate-pulse-soft flex justify-center items-center">
                 <img
-                  src="https://images.unsplash.com/photo-1509358211525-24298075b281?auto=format&fit=crop&w=400&q=80"
-                  alt="Ceylon Cinnamon"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-
-              {/* Main Bowl Feature Image (Matching circular dish layout) */}
-              <div className="relative w-80 h-80 sm:w-96 sm:h-96 rounded-full p-3 bg-white shadow-2xl border-4 border-cefi-gold/30 z-10">
-                <img
-                  src="https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=800&q=80"
+                  src="/images/hero-mortar.png"
                   alt="Ceylon Spices & Natural Products"
-                  className="w-full h-full object-cover rounded-full shadow-inner"
-                />
-              </div>
-
-              {/* Floating Product Shot 2: Single Origin Tea Leaf Bottom Right */}
-              <div className="absolute -bottom-6 -right-6 z-20 w-32 h-32 rounded-2xl overflow-hidden shadow-xl border-4 border-white animate-float-delayed">
-                <img
-                  src="https://images.unsplash.com/photo-1597481499750-3e6b22637e12?auto=format&fit=crop&w=400&q=80"
-                  alt="Ceylon Black Tea"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain drop-shadow-2xl scale-125 hover:scale-150 transition-transform duration-700"
                 />
               </div>
 
@@ -155,8 +141,55 @@ export default function HomePage({ onOpenQuoteModal }) {
         </div>
       </section>
 
+      {/* 2.5 Features / Trust Badges */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-10 relative z-30">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 flex flex-col md:flex-row items-center justify-between gap-4 divide-y md:divide-y-0 md:divide-x divide-gray-200">
+          
+          <div className="group flex items-center space-x-4 px-4 w-full md:w-1/4 pt-4 md:pt-0 first:pt-0 cursor-default">
+            <div className="w-14 h-14 shrink-0 overflow-hidden rounded-full bg-gray-100 flex items-center justify-center transition-colors duration-300 group-hover:bg-cefi-green">
+              <img src="/icon-truck.png" alt="Delivery Icon" className="w-8 h-8 object-contain transition-all duration-300 group-hover:brightness-0 group-hover:invert" />
+            </div>
+            <div>
+              <h4 className="font-sans font-bold text-cefi-earth text-[13px] md:text-sm transition-colors group-hover:text-cefi-green">Island-Wide Delivery</h4>
+              <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">Fresh products delivered across Sri Lanka.</p>
+            </div>
+          </div>
+
+          <div className="group flex items-center space-x-4 px-4 w-full md:w-1/4 pt-4 md:pt-0 cursor-default">
+            <div className="w-14 h-14 shrink-0 overflow-hidden rounded-full bg-gray-100 flex items-center justify-center transition-colors duration-300 group-hover:bg-cefi-green">
+              <img src="/icon-award.png" alt="Award Icon" className="w-8 h-8 object-contain transition-all duration-300 group-hover:brightness-0 group-hover:invert" />
+            </div>
+            <div>
+              <h4 className="font-sans font-bold text-cefi-earth text-[13px] md:text-sm transition-colors group-hover:text-cefi-green">Premium Quality</h4>
+              <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">Every product is quality-checked and sealed for freshness.</p>
+            </div>
+          </div>
+
+          <div className="group flex items-center space-x-4 px-4 w-full md:w-1/4 pt-4 md:pt-0 cursor-default">
+            <div className="w-14 h-14 shrink-0 overflow-hidden rounded-full bg-gray-100 flex items-center justify-center transition-colors duration-300 group-hover:bg-cefi-green">
+              <img src="/icon-card.png" alt="Secure Checkout Icon" className="w-8 h-8 object-contain transition-all duration-300 group-hover:brightness-0 group-hover:invert" />
+            </div>
+            <div>
+              <h4 className="font-sans font-bold text-cefi-earth text-[13px] md:text-sm transition-colors group-hover:text-cefi-green">Secure Checkout</h4>
+              <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">Trusted, secure and hassle-free payments.</p>
+            </div>
+          </div>
+
+          <div className="group flex items-center space-x-4 px-4 w-full md:w-1/4 pt-4 md:pt-0 cursor-default">
+            <div className="w-14 h-14 shrink-0 overflow-hidden rounded-full bg-gray-100 flex items-center justify-center transition-colors duration-300 group-hover:bg-cefi-green">
+              <img src="/icon-headset.png" alt="Support Icon" className="w-8 h-8 object-contain transition-all duration-300 group-hover:brightness-0 group-hover:invert" />
+            </div>
+            <div>
+              <h4 className="font-sans font-bold text-cefi-earth text-[13px] md:text-sm transition-colors group-hover:text-cefi-green">Real Support</h4>
+              <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">Friendly, human help available at all times.</p>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
       {/* 3. "Explore our Collection" — Category Cards Row */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <Reveal as="section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center space-y-2 mb-10">
           <h2 className="font-serif font-bold text-3xl sm:text-4xl text-cefi-earth">
             Explore our Collection
@@ -186,16 +219,26 @@ export default function HomePage({ onOpenQuoteModal }) {
           </button>
 
           {/* Grid of Categories */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
-            {categories.map((cat) => (
-              <CategoryCard key={cat.id || cat.slug} category={cat} />
-            ))}
+          <div className="overflow-hidden px-2">
+            <div
+              key={categoryScrollIndex}
+              className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 ${
+                carouselDirection === 'right' ? 'animate-enter-from-right' : 'animate-enter-from-left'
+              }`}
+            >
+              {[0, 1, 2, 3].map((offset) => {
+                if (categories.length === 0) return null;
+                const cat = categories[(categoryScrollIndex + offset) % categories.length];
+                // Use offset in key to prevent React from unmounting/remounting same items in different positions
+                return <CategoryCard key={`${cat.id || cat.slug}-${offset}`} category={cat} />;
+              })}
+            </div>
           </div>
         </div>
-      </section>
+      </Reveal>
 
       {/* Featured Products Showcase */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <Reveal as="section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row items-start md:items-end justify-between mb-8 pb-4 border-b border-gray-200">
           <div>
             <span className="text-xs font-bold uppercase tracking-wider text-cefi-gold">Handpicked Harvests</span>
@@ -208,21 +251,23 @@ export default function HomePage({ onOpenQuoteModal }) {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {featuredProducts.slice(0, 4).map((product) => (
-            <ProductCard key={product.id} product={product} onOpenQuoteModal={onOpenQuoteModal} />
+          {featuredProducts.slice(0, 4).map((product, i) => (
+            <Reveal key={product.id} delay={i * 90}>
+              <ProductCard product={product} onOpenQuoteModal={onOpenQuoteModal} />
+            </Reveal>
           ))}
         </div>
-      </section>
+      </Reveal>
 
       {/* 4. "Our Story" Section */}
       <section className="bg-cefi-cream py-16 border-y border-cefi-cream-dark/60">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <Reveal as="div" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             
             {/* Split Layout: Image Side */}
             <div className="relative rounded-3xl overflow-hidden shadow-2xl border-4 border-white aspect-[4/3]">
               <img
-                src="https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=1000&q=80"
+                src="/images/our-story.jpg"
                 alt="Ceylon Tea and Spice Plantations"
                 className="w-full h-full object-cover"
               />
@@ -275,19 +320,19 @@ export default function HomePage({ onOpenQuoteModal }) {
             </div>
 
           </div>
-        </div>
+        </Reveal>
       </section>
 
       {/* 5. Why Choose CEFI Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <Reveal as="section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-2xl mx-auto mb-12">
           <span className="text-xs font-bold uppercase tracking-wider text-cefi-gold">The CEFI Advantage</span>
           <h2 className="font-serif font-bold text-3xl text-cefi-earth mt-1">Why Choose CEFI?</h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          
-          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-soft text-center space-y-3">
+
+          <Reveal delay={0} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-soft text-center space-y-3">
             <div className="w-14 h-14 bg-cefi-green/10 text-cefi-green rounded-2xl flex items-center justify-center mx-auto">
               <Award className="w-7 h-7" />
             </div>
@@ -295,9 +340,9 @@ export default function HomePage({ onOpenQuoteModal }) {
             <p className="text-xs text-gray-500 leading-relaxed">
               Authentic Single-Origin Ceylon tea and True Cinnamon grown in Sri Lanka's unique soil microclimates.
             </p>
-          </div>
+          </Reveal>
 
-          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-soft text-center space-y-3">
+          <Reveal delay={90} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-soft text-center space-y-3">
             <div className="w-14 h-14 bg-cefi-green/10 text-cefi-green rounded-2xl flex items-center justify-center mx-auto">
               <ShieldCheck className="w-7 h-7" />
             </div>
@@ -305,9 +350,9 @@ export default function HomePage({ onOpenQuoteModal }) {
             <p className="text-xs text-gray-500 leading-relaxed">
               HACCP & ISO 22000 compliant processing facilities ensuring zero contamination and maximum freshness.
             </p>
-          </div>
+          </Reveal>
 
-          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-soft text-center space-y-3">
+          <Reveal delay={180} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-soft text-center space-y-3">
             <div className="w-14 h-14 bg-cefi-green/10 text-cefi-green rounded-2xl flex items-center justify-center mx-auto">
               <Truck className="w-7 h-7" />
             </div>
@@ -315,9 +360,9 @@ export default function HomePage({ onOpenQuoteModal }) {
             <p className="text-xs text-gray-500 leading-relaxed">
               Guaranteed year-round inventory dispatch for retail distributors and bulk export buyers worldwide.
             </p>
-          </div>
+          </Reveal>
 
-          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-soft text-center space-y-3">
+          <Reveal delay={270} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-soft text-center space-y-3">
             <div className="w-14 h-14 bg-cefi-green/10 text-cefi-green rounded-2xl flex items-center justify-center mx-auto">
               <RefreshCw className="w-7 h-7" />
             </div>
@@ -325,20 +370,20 @@ export default function HomePage({ onOpenQuoteModal }) {
             <p className="text-xs text-gray-500 leading-relaxed">
               Custom OEM private labeling, bulk vacuum packaging, and complete customs export documentation.
             </p>
-          </div>
+          </Reveal>
 
         </div>
-      </section>
+      </Reveal>
 
       {/* 6. Newsletter / "Join the List" Band (Matching Reference Image 3) */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <Reveal as="section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-cefi-earth rounded-3xl p-8 sm:p-12 text-white relative overflow-hidden shadow-2xl border border-cefi-gold/20">
-          
+
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">
-            
+
             {/* Left Image (Matching rounded product bowl dish layout from reference) */}
             <div className="lg:col-span-4 flex justify-center">
-              <div className="w-48 h-48 sm:w-56 sm:h-56 rounded-full p-2 bg-white/10 backdrop-blur-md border-2 border-cefi-gold/40 shadow-xl overflow-hidden">
+              <div className="w-48 h-48 sm:w-56 sm:h-56 rounded-full p-2 bg-white/10 backdrop-blur-md border-2 border-cefi-gold/40 shadow-xl overflow-hidden animate-float">
                 <img
                   src="https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=600&q=80"
                   alt="Join CEFI Inner Circle"
@@ -384,7 +429,7 @@ export default function HomePage({ onOpenQuoteModal }) {
           </div>
 
         </div>
-      </section>
+      </Reveal>
 
     </div>
   );

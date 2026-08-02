@@ -7,40 +7,42 @@ export default function CategoryCard({ category }) {
   const initial = category.name ? category.name.charAt(0).toUpperCase() : 'C';
 
   return (
-    <div className="group relative bg-white rounded-2xl p-6 border border-gray-100 shadow-soft hover:shadow-hover transition-all duration-300 flex flex-col items-center text-center transform hover:-translate-y-1 overflow-hidden">
+    <div className="group relative bg-white p-6 border-2 border-gray-100 shadow-sm hover:border-cefi-earth hover:shadow-md transition-all duration-300 flex flex-col items-center text-center overflow-hidden">
       
       {/* Background Watermark Initial */}
-      <div className="absolute top-4 select-none pointer-events-none text-9xl font-serif font-black text-gray-100/60 group-hover:text-cefi-gold/10 transition-colors z-0">
+      <div className="absolute top-12 left-6 select-none pointer-events-none text-[10rem] leading-none font-serif font-black text-gray-200/70 group-hover:text-cefi-earth transition-colors duration-300 z-0">
         {initial}
       </div>
 
-      {/* Category Image */}
-      <div className="relative z-10 w-36 h-36 mb-4 rounded-full overflow-hidden border-4 border-cefi-cream shadow-md transform group-hover:scale-105 transition-transform duration-500">
+      {/* Category Image - true transparent PNG, no blend mode needed */}
+      <div className="relative z-10 w-44 h-44 mb-6 transform group-hover:scale-105 transition-transform duration-500 flex items-center justify-center">
         <img
           src={category.image_url}
           alt={category.name}
-          className="w-full h-full object-cover"
+          className="max-w-full max-h-full object-contain drop-shadow-lg"
           loading="lazy"
         />
       </div>
 
       {/* Content */}
-      <div className="relative z-10 space-y-2 max-w-xs">
-        <h3 className="font-serif font-bold text-xl text-cefi-earth group-hover:text-cefi-green transition-colors">
+      <div className="relative z-10 space-y-3 max-w-xs">
+        <h3 className="font-serif font-bold text-lg text-cefi-earth">
           {category.name}
         </h3>
-        <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed font-sans min-h-[32px]">
+        <p className="text-xs text-gray-500 line-clamp-3 leading-relaxed font-sans min-h-[48px]">
           {category.description}
         </p>
 
-        {/* Shop Link Pill Button */}
-        <div className="pt-3">
+        {/* Shop Link (Icon circle + Text) */}
+        <div className="pt-4 pb-2">
           <Link
             to={`/products/${category.slug}`}
-            className="inline-flex items-center space-x-2 px-5 py-2 bg-cefi-earth/85 hover:bg-cefi-green text-white rounded-full text-xs font-semibold shadow-sm transition-colors group-hover:bg-cefi-green"
+            className="inline-flex items-center space-x-3 text-sm font-bold text-cefi-earth hover:text-cefi-green transition-colors"
           >
+            <div className="w-8 h-8 rounded-full bg-cefi-earth text-white flex items-center justify-center group-hover:bg-cefi-green-dark transition-colors">
+              <ArrowRight className="w-4 h-4" />
+            </div>
             <span>Shop now</span>
-            <ArrowRight className="w-3.5 h-3.5 text-cefi-gold" />
           </Link>
         </div>
       </div>

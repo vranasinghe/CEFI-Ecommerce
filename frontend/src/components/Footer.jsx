@@ -67,16 +67,11 @@ export default function Footer() {
         {/* Column 1: Brand & Tagline */}
         <div className="space-y-4">
           <Link to="/" className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-full bg-cefi-green p-1.5 border-2 border-cefi-gold flex items-center justify-center">
-              <svg viewBox="0 0 100 100" className="w-full h-full text-cefi-gold fill-current">
-                <path d="M 50,10 A 40,40 0 1,0 90,50 A 30,30 0 1,1 50,10 Z" fill="#C9971C" />
-                <path d="M48 78 L52 78 L51 45 L49 45 Z" fill="#FFFFFF" />
-                <path d="M50 45 C40 35 25 35 20 40 C30 45 42 45 50 47 C58 45 70 45 80 40 C75 35 60 35 50 45 Z" fill="#FFFFFF" />
-              </svg>
+            <div className="w-12 h-12 flex items-center justify-center">
+              <img src="/logo.png" alt="CEFI Logo" className="w-full h-full object-contain drop-shadow-md brightness-0 invert opacity-90" />
             </div>
-            <div>
-              <span className="font-serif text-2xl font-bold text-white tracking-tight">Cefi</span>
-              <span className="block text-[9px] uppercase tracking-widest text-cefi-gold font-semibold">Ceylon Eco Fresh</span>
+            <div className="h-10 w-48 sm:w-56">
+              <img src="/logo-text.png" alt="CEFI Wordmark" className="w-full h-full object-contain object-left drop-shadow-sm brightness-0 invert opacity-90" />
             </div>
           </Link>
 

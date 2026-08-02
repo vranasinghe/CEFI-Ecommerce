@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ShoppingBag, Globe, ArrowLeft, ShieldCheck, Truck, RefreshCw, Plus, Minus, CheckCircle, Share2 } from 'lucide-react';
+import { RefreshCw, Plus, Minus, ShoppingBag, Zap, ChevronRight, Leaf, Shield, Truck } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import ProductCard from '../components/ProductCard';
 
@@ -13,241 +13,347 @@ export default function ProductDetailPage({ onOpenQuoteModal }) {
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [selectedImage, setSelectedImage] = useState('');
   const [quantity, setQuantity] = useState(1);
-  const [activeTab, setActiveTab] = useState('retail'); // 'retail' vs 'wholesale'
+  const [selectedType, setSelectedType] = useState('');
+  const [selectedSize, setSelectedSize] = useState('');
   const [loading, setLoading] = useState(true);
+  const [addedToCart, setAddedToCart] = useState(false);
 
   useEffect(() => {
     setLoading(true);
+    setAddedToCart(false);
     fetch(`/api/products/${slug}`)
       .then(res => res.json())
       .then(data => {
         setProduct(data);
-        if (data.images && data.images.length > 0) {
-          setSelectedImage(data.images[0]);
+        if (data.images && data.images.length > 0) setSelectedImage(data.images[0]);
+        if (data.variants) {
+          if (data.variants.type?.length > 0) setSelectedType(data.variants.type[0]);
+          if (data.variants.size?.length > 0) setSelectedSize(data.variants.size[0]);
         }
-        if (data.is_wholesale_only) {
-          setActiveTab('wholesale');
-        }
-
-        // Fetch related category products
         fetch(`/api/products?category=${data.category_slug}`)
           .then(r => r.json())
           .then(rel => setRelatedProducts(rel.filter(p => p.id !== data.id)))
           .catch(() => {});
-
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, [slug]);
 
+  const handleAddToCart = () => {
+    addToCart({ ...product, selectedType, selectedSize }, quantity);
+    setAddedToCart(true);
+    setTimeout(() => setAddedToCart(false), 2000);
+  };
+
+  const parseDescription = (text) => {
+    if (!text) return [];
+    const lines = text.split('\n');
+    const blocks = [];
+    let currentBlock = null;
+
+    lines.forEach((line, idx) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+
+      // Section headers end with ':'
+      if (trimmed.endsWith(':')) {
+        if (currentBlock) blocks.push(currentBlock);
+        currentBlock = { type: 'section', header: trimmed, items: [] };
+      } else if (trimmed.includes(':') && (trimmed.toLowerCase().startsWith('ingredients:') || trimmed.toLowerCase().startsWith('storage instructions:') || trimmed.toLowerCase().startsWith('available '))) {
+        const colonIndex = trimmed.indexOf(':');
+        const header = trimmed.substring(0, colonIndex + 1);
+        const content = trimmed.substring(colonIndex + 1).trim();
+        if (currentBlock) blocks.push(currentBlock);
+        currentBlock = { type: 'section', header: header, items: content ? [content] : [] };
+      } else if (currentBlock) {
+        currentBlock.items.push(trimmed);
+      } else {
+        blocks.push({ type: 'text', content: trimmed });
+      }
+    });
+
+    if (currentBlock) blocks.push(currentBlock);
+    return blocks;
+  };
+
   if (loading) {
     return (
-      <div className="py-24 text-center space-y-3">
-        <RefreshCw className="w-8 h-8 text-cefi-green animate-spin mx-auto" />
-        <p className="text-sm text-gray-500 font-medium">Fetching Ceylon product specifications...</p>
+      <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4">
+        <div className="relative">
+          <div className="w-16 h-16 border-4 border-cefi-green/20 rounded-full"></div>
+          <div className="w-16 h-16 border-4 border-cefi-green border-t-transparent rounded-full animate-spin absolute inset-0"></div>
+        </div>
+        <p className="text-sm text-gray-500 font-medium tracking-wide">Loading product details...</p>
       </div>
     );
   }
 
   if (!product) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-20 text-center space-y-4">
+      <div className="max-w-4xl mx-auto px-4 py-20 text-center space-y-6">
+        <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
+          <Leaf className="w-8 h-8 text-gray-400" />
+        </div>
         <h2 className="font-serif font-bold text-2xl text-cefi-earth">Product Not Found</h2>
-        <p className="text-xs text-gray-500">The Ceylon product you requested does not exist or has been updated.</p>
-        <Link to="/products" className="inline-block px-6 py-2.5 bg-cefi-green text-white text-xs font-semibold rounded-full">
-          Back to Catalog
+        <p className="text-sm text-gray-500">The product you're looking for doesn't exist or may have been moved.</p>
+        <Link to="/products" className="inline-flex items-center gap-2 px-8 py-3 bg-cefi-green text-white text-sm font-semibold rounded-full hover:bg-cefi-green-dark transition-colors">
+          Back to Products
         </Link>
       </div>
     );
   }
 
+  const descriptionBlocks = parseDescription(product.full_description || product.short_description);
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12">
-      
-      {/* Breadcrumb Navigation */}
-      <div className="flex items-center space-x-2 text-xs text-gray-500">
-        <Link to="/" className="hover:text-cefi-green">Home</Link>
-        <span>/</span>
-        <Link to="/products" className="hover:text-cefi-green">Products</Link>
-        <span>/</span>
-        <Link to={`/products/${product.category_slug}`} className="hover:text-cefi-green capitalize">{product.category_name || product.category_slug}</Link>
-        <span>/</span>
-        <span className="text-cefi-earth font-semibold truncate max-w-xs">{product.name}</span>
+    <div className="bg-[#F5F3EE] min-h-screen">
+      {/* Breadcrumb */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-2">
+        <nav className="flex items-center space-x-1.5 text-xs text-gray-400">
+          <Link to="/" className="hover:text-cefi-green transition-colors">Home</Link>
+          <ChevronRight className="w-3 h-3" />
+          <Link to="/products" className="hover:text-cefi-green transition-colors">Products</Link>
+          <ChevronRight className="w-3 h-3" />
+          <Link to={`/products/${product.category_slug}`} className="hover:text-cefi-green capitalize transition-colors">
+            {product.category_name || product.category_slug}
+          </Link>
+          <ChevronRight className="w-3 h-3" />
+          <span className="text-cefi-earth font-medium truncate max-w-[200px]">{product.name}</span>
+        </nav>
       </div>
 
-      {/* Main Detail Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-        
-        {/* Left Column: Image Gallery */}
-        <div className="lg:col-span-6 space-y-4">
-          
-          <div className="relative aspect-square rounded-3xl overflow-hidden bg-white border border-gray-100 shadow-lg">
-            <img
-              src={selectedImage || (product.images && product.images[0])}
-              alt={product.name}
-              className="w-full h-full object-cover transition-all duration-300"
-            />
-            
-            {product.is_wholesale_only && (
-              <span className="absolute top-4 right-4 px-3 py-1 bg-cefi-gold text-cefi-earth font-bold text-xs rounded-full shadow-sm flex items-center space-x-1">
-                <Globe className="w-3.5 h-3.5" />
-                <span>Export / Bulk Product</span>
-              </span>
+      {/* Main Product Section */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-start">
+
+          {/* ── LEFT: Image Gallery ── */}
+          <div className="space-y-4">
+            {/* Main Image */}
+            <div className="bg-white rounded-2xl overflow-hidden aspect-square flex items-center justify-center p-6 shadow-sm border border-gray-100">
+              <img
+                key={selectedImage}
+                src={selectedImage || product.images?.[0]}
+                alt={product.name}
+                className="max-w-full max-h-full object-contain transition-opacity duration-300"
+              />
+            </div>
+
+            {/* Thumbnails */}
+            {product.images?.length > 1 && (
+              <div className="flex items-center gap-3 overflow-x-auto pb-1">
+                {product.images.map((img, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setSelectedImage(img)}
+                    className={`w-20 h-20 rounded-xl flex-shrink-0 overflow-hidden border-2 transition-all duration-200 bg-white p-1.5 ${
+                      selectedImage === img
+                        ? 'border-cefi-green shadow-md'
+                        : 'border-transparent opacity-60 hover:opacity-100 hover:border-gray-200'
+                    }`}
+                  >
+                    <img src={img} alt="" className="w-full h-full object-contain rounded-lg" />
+                  </button>
+                ))}
+              </div>
             )}
           </div>
 
-          {/* Thumbnail Strip */}
-          {product.images && product.images.length > 1 && (
-            <div className="flex items-center space-x-3 overflow-x-auto pb-2">
-              {product.images.map((img, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setSelectedImage(img)}
-                  className={`w-20 h-20 rounded-xl overflow-hidden border-2 transition-all shrink-0 ${
-                    selectedImage === img ? 'border-cefi-green shadow-md scale-105' : 'border-gray-200 opacity-70 hover:opacity-100'
-                  }`}
-                >
-                  <img src={img} alt="" className="w-full h-full object-cover" />
-                </button>
-              ))}
+          {/* ── RIGHT: Product Details ── */}
+          <div className="space-y-6">
+            {/* Category + Name + Price */}
+            <div className="space-y-3">
+              <span className="inline-block text-[10px] font-bold tracking-[0.2em] uppercase text-cefi-green bg-cefi-green/10 px-3 py-1 rounded-full">
+                CEFI {product.category_name || product.category_slug}
+              </span>
+              <h1 className="font-serif text-3xl sm:text-4xl text-cefi-earth leading-snug">
+                {product.name}
+              </h1>
+              {product.is_wholesale_only && (
+                <p className="text-sm text-amber-600 font-medium mt-2">
+                  Wholesale Item - Inquire for details
+                </p>
+              )}
             </div>
-          )}
 
-        </div>
+            <div className="h-px bg-gray-200"></div>
 
-        {/* Right Column: Product Content & Retail vs Wholesale Mode */}
-        <div className="lg:col-span-6 space-y-6">
-          
-          <div>
-            <span className="text-xs uppercase tracking-widest font-bold text-cefi-gold">
-              {product.category_name || product.category_slug} • Pure Ceylon
-            </span>
-            <h1 className="font-serif font-bold text-3xl sm:text-4xl text-cefi-earth mt-1 leading-tight">
-              {product.name}
-            </h1>
-            <p className="text-xs text-gray-500 mt-2 flex items-center space-x-4">
-              <span>Origin: <strong>{product.origin || 'Sri Lanka'}</strong></span>
-              <span>•</span>
-              <span>Weight: <strong>{product.weight_g}g net</strong></span>
-            </p>
-          </div>
+            {/* Variants */}
+            <div className="space-y-5">
+              {/* Type Selector */}
+              {product.variants?.type && (
+                <div className="space-y-2.5">
+                  <label className="text-sm font-semibold text-cefi-earth block">
+                    Type: <span className="font-normal text-gray-500">{selectedType}</span>
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {product.variants.type.map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => setSelectedType(type)}
+                        className={`px-5 py-2 rounded-full text-sm font-medium border transition-all duration-200 ${
+                          selectedType === type
+                            ? 'bg-cefi-green text-white border-cefi-green shadow-sm'
+                            : 'bg-white text-gray-600 border-gray-200 hover:border-cefi-green hover:text-cefi-green'
+                        }`}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-          {/* Retail vs Wholesale Inquiry Toggle Segment */}
-          <div className="bg-cefi-cream p-1.5 rounded-2xl flex items-center border border-cefi-cream-dark">
-            <button
-              onClick={() => setActiveTab('retail')}
-              className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all text-center ${
-                activeTab === 'retail' 
-                  ? 'bg-white text-cefi-green shadow-sm' 
-                  : 'text-gray-500 hover:text-cefi-earth'
-              }`}
-            >
-              Retail Purchase
-            </button>
-            <button
-              onClick={() => setActiveTab('wholesale')}
-              className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1 ${
-                activeTab === 'wholesale' 
-                  ? 'bg-cefi-green text-white shadow-sm' 
-                  : 'text-gray-500 hover:text-cefi-earth'
-              }`}
-            >
-              <Globe className="w-3.5 h-3.5 text-cefi-gold" />
-              <span>Wholesale / Export Quote</span>
-            </button>
-          </div>
+              {/* Size Selector */}
+              {product.variants?.size && (
+                <div className="space-y-2.5">
+                  <label className="text-sm font-semibold text-cefi-earth block">
+                    Size: <span className="font-normal text-gray-500">{selectedSize}</span>
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {product.variants.size.map((size) => (
+                      <button
+                        key={size}
+                        onClick={() => setSelectedSize(size)}
+                        className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-all duration-200 ${
+                          selectedSize === size
+                            ? 'bg-cefi-green text-white border-cefi-green shadow-sm'
+                            : 'bg-white text-gray-600 border-gray-200 hover:border-cefi-green hover:text-cefi-green'
+                        }`}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
-          {/* Pricing / Mode Description */}
-          {activeTab === 'retail' ? (
-            <div className="space-y-4">
-              <div className="flex items-baseline space-x-3">
-                <span className="font-serif font-extrabold text-3xl text-cefi-green">
-                  ${product.price ? product.price.toFixed(2) : '12.00'}
-                </span>
-                <span className="text-xs text-gray-400">USD / package</span>
-              </div>
-
-              {/* Quantity Selector & Add to Cart */}
-              <div className="flex items-center space-x-4 pt-2">
-                <div className="flex items-center space-x-3 bg-white border border-gray-200 rounded-full px-4 py-2">
+            {/* Quantity + Buttons */}
+            <div className="space-y-3 pt-1">
+              {/* Quantity */}
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-semibold text-cefi-earth">Qty:</span>
+                <div className="inline-flex items-center bg-white border border-gray-200 rounded-full shadow-sm overflow-hidden">
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="p-1 hover:bg-gray-100 rounded-full"
+                    className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-cefi-green hover:bg-gray-50 transition-colors"
                   >
-                    <Minus className="w-3.5 h-3.5 text-gray-600" />
+                    <Minus className="w-3.5 h-3.5" />
                   </button>
-                  <span className="font-bold text-sm text-cefi-earth w-6 text-center">{quantity}</span>
+                  <span className="w-10 text-center text-sm font-bold text-cefi-earth">{quantity}</span>
                   <button
                     onClick={() => setQuantity(quantity + 1)}
-                    className="p-1 hover:bg-gray-100 rounded-full"
+                    className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-cefi-green hover:bg-gray-50 transition-colors"
                   >
-                    <Plus className="w-3.5 h-3.5 text-gray-600" />
+                    <Plus className="w-3.5 h-3.5" />
                   </button>
                 </div>
+              </div>
 
-                <button
-                  onClick={() => addToCart(product, quantity)}
-                  className="flex-1 py-3.5 bg-cefi-green hover:bg-cefi-green-dark text-white rounded-full font-serif font-bold text-sm shadow-md flex items-center justify-center space-x-2 transition-all"
-                >
-                  <ShoppingBag className="w-4 h-4 text-cefi-gold" />
-                  <span>Add {quantity} to Basket</span>
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 space-y-3">
-              <div className="flex items-center space-x-2 text-cefi-green font-bold text-sm">
-                <Globe className="w-4 h-4 text-cefi-gold" />
-                <span>Bulk Commercial Export Dispatch</span>
-              </div>
-              <p className="text-xs text-emerald-900 leading-relaxed">
-                CEFI exports bulk tea bags, spices in 25kg sacks, and custom OEM private label containers to distributors in over 40 countries.
-              </p>
+              {/* Add to Cart */}
               <button
-                onClick={() => onOpenQuoteModal && onOpenQuoteModal(product.name)}
-                className="w-full py-3 bg-cefi-gold hover:bg-cefi-gold-dark text-cefi-earth font-serif font-bold text-sm rounded-full shadow-sm transition-all"
+                onClick={handleAddToCart}
+                className={`w-full py-3.5 rounded-xl text-sm font-semibold border-2 transition-all duration-300 flex items-center justify-center gap-2 ${
+                  addedToCart
+                    ? 'bg-cefi-green border-cefi-green text-white'
+                    : 'bg-white border-cefi-green text-cefi-green hover:bg-cefi-green hover:text-white'
+                }`}
               >
-                Request Export Quotation for {product.name}
+                <ShoppingBag className="w-4 h-4" />
+                {addedToCart ? 'Added to Cart ✓' : 'Add to Cart'}
+              </button>
+
+              {/* Buy it Now */}
+              <button
+                onClick={() => {
+                  addToCart({ ...product, selectedType, selectedSize }, quantity);
+                  navigate('/checkout');
+                }}
+                className="w-full py-3.5 rounded-xl text-sm font-semibold bg-cefi-green hover:bg-cefi-green-dark text-white transition-all duration-200 flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+              >
+                <Zap className="w-4 h-4" />
+                Buy it now
               </button>
             </div>
-          )}
 
-          {/* Full Description */}
-          <div className="space-y-2 pt-4 border-t border-gray-100">
-            <h3 className="font-serif font-bold text-base text-cefi-earth">Product Overview</h3>
-            <p className="text-xs text-cefi-earth/80 leading-relaxed font-sans whitespace-pre-line">
-              {product.full_description || product.short_description}
-            </p>
-          </div>
-
-          {/* Value Badges */}
-          <div className="grid grid-cols-2 gap-3 pt-4 border-t border-gray-100 text-xs">
-            <div className="flex items-center space-x-2.5 text-gray-600">
-              <ShieldCheck className="w-4 h-4 text-cefi-green shrink-0" />
-              <span>ISO 22000 Certified Quality</span>
-            </div>
-            <div className="flex items-center space-x-2.5 text-gray-600">
-              <Truck className="w-4 h-4 text-cefi-green shrink-0" />
-              <span>Worldwide Air & Freight</span>
+            {/* Trust Badges */}
+            <div className="grid grid-cols-3 gap-3 pt-2">
+              {[
+                { icon: Leaf, label: 'Natural & Pure' },
+                { icon: Shield, label: 'Quality Assured' },
+                { icon: Truck, label: 'Fast Shipping' },
+              ].map(({ icon: Icon, label }) => (
+                <div key={label} className="flex flex-col items-center gap-1.5 bg-white rounded-xl py-3 px-2 border border-gray-100 text-center">
+                  <Icon className="w-5 h-5 text-cefi-green" />
+                  <span className="text-[10px] font-semibold text-gray-500 leading-tight">{label}</span>
+                </div>
+              ))}
             </div>
           </div>
-
         </div>
 
+        {/* ── Description Section ── */}
+        <div className="mt-14 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-8 py-6 border-b border-gray-100 bg-gray-50/50">
+            <h2 className="font-serif font-bold text-2xl text-cefi-earth">{product.name}</h2>
+            <p className="text-sm text-gray-500 mt-1">Product Details & Usage Guide</p>
+          </div>
+
+          <div className="px-8 py-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-8">
+              {descriptionBlocks.map((block, idx) => {
+                if (block.type === 'text') {
+                  return (
+                    <p key={idx} className="text-sm text-gray-600 leading-relaxed col-span-full">
+                      {block.content}
+                    </p>
+                  );
+                }
+
+                // Sections with bullet items
+                const isList = block.items.length > 1;
+                return (
+                  <div key={idx} className={`space-y-2 ${block.items.length > 4 ? '' : ''}`}>
+                    <h3 className="text-sm font-bold text-cefi-earth uppercase tracking-wide flex items-center gap-2">
+                      <span className="w-1 h-4 bg-cefi-green rounded-full inline-block"></span>
+                      {block.header.replace(':', '')}
+                    </h3>
+                    {isList ? (
+                      <ul className="space-y-1.5">
+                        {block.items.map((item, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
+                            <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-cefi-green/60 shrink-0"></span>
+                            <span className="leading-relaxed">{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-gray-600 leading-relaxed pl-3">{block.items[0]}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Related Products ── */}
+        {relatedProducts.length > 0 && (
+          <div className="mt-14 space-y-6">
+            <div className="flex items-center justify-between">
+              <h3 className="font-serif font-bold text-2xl text-cefi-earth">You Might Also Like</h3>
+              <Link to={`/products/${product.category_slug}`} className="text-sm text-cefi-green hover:underline font-medium flex items-center gap-1">
+                View all <ChevronRight className="w-4 h-4" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              {relatedProducts.slice(0, 4).map(rel => (
+                <ProductCard key={rel.id} product={rel} onOpenQuoteModal={onOpenQuoteModal} />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
-
-      {/* Related Products Section */}
-      {relatedProducts.length > 0 && (
-        <div className="pt-12 border-t border-gray-200 space-y-6">
-          <h3 className="font-serif font-bold text-2xl text-cefi-earth">You Might Also Like</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {relatedProducts.slice(0, 4).map(rel => (
-              <ProductCard key={rel.id} product={rel} onOpenQuoteModal={onOpenQuoteModal} />
-            ))}
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }

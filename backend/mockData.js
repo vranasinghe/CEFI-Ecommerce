@@ -86,6 +86,7 @@ const products = [
       "https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=800&q=80"
     ]
   },
+
   {
     id: "prod-3",
     category_id: "cat-2",
@@ -93,16 +94,21 @@ const products = [
     category_name: "Tea",
     name: "Organic Ceylon Green Tea Leaf (BOP)",
     slug: "organic-ceylon-green-tea-leaf",
-    short_description: "Clean, toasted-nut finish packed with natural polyphenols.",
-    full_description: "Sourced from certified organic estates in Dimbula, this loose-leaf green tea is steamed and rolled gently to preserve its leafy freshness, chlorophyll content, and sweet nutty aroma.",
+    short_description: "Premium quality Green Tea Leaves, carefully selected and dried to preserve their natural freshness.",
+    full_description: "About:\nPremium quality Green Tea Leaves, carefully selected and dried to preserve their natural freshness, aroma, and beneficial antioxidants.\n\nUsage:\nSuitable for hot tea, iced tea, and herbal beverage preparations.\n\nKnown to:\nRich in natural antioxidants.\nSupport overall wellness.\nHelp maintain healthy metabolism.\nPromote mental alertness.\nSupport heart health.\nRefresh and revitalize the body.\nTraditionally enjoyed as a daily wellness beverage.\n\nHow to Make Green Tea:\nBoil 1 cup of water and allow it to cool slightly (80–85°C).\nAdd 1–2 teaspoons of Green Tea Leaves.\nSteep for 2–3 minutes.\nStrain if desired.\nEnjoy warm or chilled.\n\nIngredients: 100% Green Tea Leaves (Camellia sinensis).\nStorage Instructions: Store in a cool, dry place away from direct sunlight. Reseal after opening.",
     price: 12.00,
     is_wholesale_only: false,
-    weight_g: 200,
+    weight_g: 100,
     origin: "Dimbula, Sri Lanka",
-    stock_quantity: 320,
-    is_featured: false,
+    stock_quantity: 500,
+    is_featured: true,
+    variants: {
+      type: ["Dried Leaves", "Tea Bags"],
+      size: ["50g", "100g", "250g", "500g", "1kg", "5kg", "10kg", "25kg"]
+    },
     images: [
-      "https://images.unsplash.com/photo-1627435601361-ec25f5b1d0e5?auto=format&fit=crop&w=800&q=80"
+      "https://images.unsplash.com/photo-1627435601361-ec25f5b1d0e5?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1597481499750-3e6b22637e12?auto=format&fit=crop&w=800&q=80"
     ]
   },
 

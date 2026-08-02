@@ -1,6 +1,16 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
+
+// Try to load multer (for file uploads)
+let multer;
+try {
+  multer = require('multer');
+} catch (e) {
+  multer = null;
+}
 
 const supabase = require('./supabaseClient');
 const mockData = require('./mockData');
@@ -8,34 +18,45 @@ const mockData = require('./mockData');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
+// ── Setup uploads directory ──────────────────────────────────────────────────
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
+
+// ── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(uploadsDir));
 
-// In-memory fallback stores for dynamic POST submissions when DB isn't linked
+// ── Multer storage config ────────────────────────────────────────────────────
+let upload = null;
+if (multer) {
+  const storage = multer.memoryStorage();
+  upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
+}
+
+// ── In-memory fallback stores ────────────────────────────────────────────────
 const localContactMessages = [];
 const localSubscribers = [];
 const localQuotes = [];
 const localOrders = [];
 
-// Health Check
+// ── Health Check ─────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'online',
     brand: 'Ceylon Eco Fresh Infinity (CEFI)',
     supabaseConnected: Boolean(supabase),
+    multerAvailable: Boolean(multer),
     timestamp: new Date().toISOString()
   });
 });
 
-// GET /api/categories
+// ── Categories ───────────────────────────────────────────────────────────────
 app.get('/api/categories', async (req, res) => {
   try {
     if (supabase) {
       const { data, error } = await supabase.from('categories').select('*');
-      if (!error && data && data.length > 0) {
-        return res.json(data);
-      }
+      if (!error && data && data.length > 0) return res.json(data);
     }
     return res.json(mockData.categories);
   } catch (err) {
@@ -43,15 +64,12 @@ app.get('/api/categories', async (req, res) => {
   }
 });
 
-// GET /api/categories/:slug
 app.get('/api/categories/:slug', async (req, res) => {
   const { slug } = req.params;
   try {
     if (supabase) {
       const { data, error } = await supabase.from('categories').select('*').eq('slug', slug).single();
-      if (!error && data) {
-        return res.json(data);
-      }
+      if (!error && data) return res.json(data);
     }
     const cat = mockData.categories.find(c => c.slug === slug);
     if (cat) return res.json(cat);
@@ -63,74 +81,40 @@ app.get('/api/categories/:slug', async (req, res) => {
   }
 });
 
-// GET /api/products (filters: category, search, sort, featured)
+// ── Products: GET all ─────────────────────────────────────────────────────────
 app.get('/api/products', async (req, res) => {
   const { category, search, sort, featured, wholesale } = req.query;
-
   try {
     let list = [...mockData.products];
-
     if (supabase) {
-      const { data, error } = await supabase.from('products').select('*, categories(name, slug)');
+      const { data, error } = await supabase.from('products').select('*');
       if (!error && data && data.length > 0) {
-        list = data.map(p => ({
-          ...p,
-          category_slug: p.categories ? p.categories.slug : p.category_slug,
-          category_name: p.categories ? p.categories.name : p.category_name
-        }));
+        list = data;
       }
     }
-
-    // Category filter
-    if (category && category !== 'all') {
-      list = list.filter(p => p.category_slug.toLowerCase() === category.toLowerCase());
-    }
-
-    // Search filter
+    if (category && category !== 'all') list = list.filter(p => (p.category_slug || '').toLowerCase() === category.toLowerCase());
     if (search) {
-      const query = search.toLowerCase();
-      list = list.filter(p => 
-        p.name.toLowerCase().includes(query) || 
-        p.short_description.toLowerCase().includes(query) ||
-        (p.full_description && p.full_description.toLowerCase().includes(query))
-      );
+      const q = search.toLowerCase();
+      list = list.filter(p => p.name.toLowerCase().includes(q) || (p.short_description || '').toLowerCase().includes(q));
     }
-
-    // Featured filter
-    if (featured === 'true') {
-      list = list.filter(p => p.is_featured);
-    }
-
-    // Wholesale filter
-    if (wholesale === 'true') {
-      list = list.filter(p => p.is_wholesale_only);
-    }
-
-    // Sorting
-    if (sort === 'price-low') {
-      list.sort((a, b) => a.price - b.price);
-    } else if (sort === 'price-high') {
-      list.sort((a, b) => b.price - a.price);
-    } else if (sort === 'name') {
-      list.sort((a, b) => a.name.localeCompare(b.name));
-    }
-
+    if (featured === 'true') list = list.filter(p => p.is_featured);
+    if (wholesale === 'true') list = list.filter(p => p.is_wholesale_only);
+    if (sort === 'price-low') list.sort((a, b) => a.price - b.price);
+    else if (sort === 'price-high') list.sort((a, b) => b.price - a.price);
+    else if (sort === 'name') list.sort((a, b) => a.name.localeCompare(b.name));
     return res.json(list);
   } catch (err) {
-    console.error('Error fetching products:', err);
     return res.json(mockData.products);
   }
 });
 
-// GET /api/products/:slug
+// ── Products: GET one ─────────────────────────────────────────────────────────
 app.get('/api/products/:slug', async (req, res) => {
   const { slug } = req.params;
   try {
     if (supabase) {
       const { data, error } = await supabase.from('products').select('*').eq('slug', slug).single();
-      if (!error && data) {
-        return res.json(data);
-      }
+      if (!error && data) return res.json(data);
     }
     const prod = mockData.products.find(p => p.slug === slug);
     if (prod) return res.json(prod);
@@ -142,181 +126,251 @@ app.get('/api/products/:slug', async (req, res) => {
   }
 });
 
-// GET /api/blog
+// ── Products: POST (Add new) ──────────────────────────────────────────────────
+app.post('/api/products', async (req, res) => {
+  const { name, slug, price, short_description, full_description, images, category_slug, is_wholesale_only, is_featured, variants } = req.body;
+  if (!name || !slug || !category_slug) {
+    return res.status(400).json({ success: false, message: 'Missing required fields.' });
+  }
+  const category = mockData.categories.find(c => c.slug === category_slug);
+  const payload = {
+    name, slug,
+    price: parseFloat(price) || 0,
+    short_description: short_description || '',
+    full_description: full_description || '',
+    images: images && images.length > 0 ? images : [],
+    category_slug,
+    category_name: category ? category.name : category_slug,
+    is_wholesale_only: Boolean(is_wholesale_only),
+    is_featured: Boolean(is_featured),
+    variants: variants || null
+  };
+  try {
+    if (supabase) {
+      const { data, error } = await supabase.from('products').insert([payload]).select();
+      if (error) {
+        console.error('Supabase insert error:', error.message);
+        return res.status(500).json({ success: false, message: error.message });
+      }
+      console.log('📦 Product Added to Supabase:', payload.name);
+      return res.json({ success: true, message: 'Product added!', product: data[0] });
+    }
+  } catch (err) { console.error(err); }
+
+  // Fallback for mock data if no Supabase
+  payload.id = `prod-${Date.now()}`;
+  mockData.products.push(payload);
+  console.log('📦 Product Added:', payload.name);
+  return res.json({ success: true, message: 'Product added!', product: payload });
+});
+
+app.put('/api/products/:id', async (req, res) => {
+  const { id } = req.params;
+  const updates = { ...req.body };
+  delete updates.id; // don't update ID
+
+  // Only send columns that exist in the Supabase products table
+  const ALLOWED_COLUMNS = ['name', 'slug', 'price', 'short_description', 'full_description',
+    'category_slug', 'category_name', 'origin', 'weight', 'weight_g', 'stock_quantity',
+    'is_wholesale_only', 'is_featured', 'images', 'variants', 'updated_at'];
+  const sanitized = {};
+  ALLOWED_COLUMNS.forEach(col => {
+    if (updates[col] !== undefined) sanitized[col] = updates[col];
+  });
+  sanitized.updated_at = new Date().toISOString();
+
+  try {
+    if (supabase) {
+      // try to update in supabase by id or slug
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      let query = supabase.from('products').update(sanitized);
+      if (isUUID) {
+        query = query.eq('id', id);
+      } else {
+        query = query.eq('slug', id);
+      }
+      
+      const { data, error } = await query.select();
+      if (error) {
+        console.error('Supabase update error:', error.message);
+        return res.status(500).json({ success: false, message: error.message });
+      }
+      if (data && data.length > 0) {
+        console.log('✏️ Product Updated in Supabase:', sanitized.name || id);
+        return res.json({ success: true, message: 'Product updated!', product: data[0] });
+      }
+      // Not found in Supabase
+      return res.status(404).json({ success: false, message: 'Product not found in database.' });
+    }
+  } catch (err) {
+    console.error('PUT error:', err);
+    return res.status(500).json({ success: false, message: 'Server error during update.' });
+  }
+
+  const idx = mockData.products.findIndex(p => p.id === id || p.slug === id);
+  if (idx === -1) return res.status(404).json({ success: false, message: 'Product not found.' });
+
+  const category = mockData.categories.find(c => c.slug === (updates.category_slug || mockData.products[idx].category_slug));
+  mockData.products[idx] = {
+    ...mockData.products[idx],
+    ...updates,
+    category_name: category ? category.name : (updates.category_slug || mockData.products[idx].category_slug),
+    price: parseFloat(updates.price) || mockData.products[idx].price,
+    updated_at: new Date().toISOString()
+  };
+
+  console.log('✏️ Product Updated locally:', mockData.products[idx].name);
+  return res.json({ success: true, message: 'Product updated!', product: mockData.products[idx] });
+});
+
+// ── Products: DELETE ──────────────────────────────────────────────────────────
+app.delete('/api/products/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    if (supabase) {
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      let query = supabase.from('products').delete();
+      if (isUUID) {
+        query = query.eq('id', id);
+      } else {
+        query = query.eq('slug', id);
+      }
+      const { error } = await query;
+      if (error) {
+        console.error('Supabase delete error:', error.message);
+        return res.status(500).json({ success: false, message: error.message });
+      }
+      console.log('🗑️ Product Deleted from Supabase:', id);
+      return res.json({ success: true, message: 'Product deleted!' });
+    }
+  } catch (err) { console.error(err); }
+
+  const idx = mockData.products.findIndex(p => p.id === id || p.slug === id);
+  if (idx === -1) return res.status(404).json({ success: false, message: 'Product not found.' });
+
+  const deleted = mockData.products.splice(idx, 1)[0];
+  console.log('🗑️ Product Deleted locally:', deleted.name);
+  return res.json({ success: true, message: 'Product deleted!' });
+});
+
+// ── Image Upload ──────────────────────────────────────────────────────────────
+app.post('/api/upload', (req, res) => {
+  if (!upload) {
+    return res.status(500).json({ success: false, message: 'Image upload not available. Run: npm install multer in the backend folder.' });
+  }
+  upload.array('images', 10)(req, res, async (err) => {
+    if (err) return res.status(400).json({ success: false, message: err.message });
+    if (!req.files || req.files.length === 0) return res.status(400).json({ success: false, message: 'No files uploaded.' });
+    
+    try {
+      if (supabase) {
+        const urls = [];
+        for (const file of req.files) {
+          const fileExt = path.extname(file.originalname);
+          const fileName = `${Date.now()}-${Math.round(Math.random() * 1e5)}${fileExt}`;
+          
+          const { data, error } = await supabase.storage
+            .from('product-images')
+            .upload(fileName, file.buffer, {
+              contentType: file.mimetype,
+              cacheControl: '3600',
+              upsert: false
+            });
+            
+          if (error) throw error;
+          
+          const { data: publicData } = supabase.storage
+            .from('product-images')
+            .getPublicUrl(fileName);
+            
+          urls.push(publicData.publicUrl);
+        }
+        return res.json({ success: true, urls });
+      }
+      
+      // Fallback if no supabase
+      const urls = req.files.map(f => `http://localhost:${PORT}/uploads/${f.originalname}`);
+      return res.json({ success: true, urls });
+    } catch (uploadError) {
+      console.error('Supabase upload error:', uploadError);
+      return res.status(500).json({ success: false, message: 'Failed to upload to Supabase' });
+    }
+  });
+});
+
+// ── Blog ─────────────────────────────────────────────────────────────────────
 app.get('/api/blog', async (req, res) => {
   try {
     if (supabase) {
       const { data, error } = await supabase.from('blog_posts').select('*').order('published_at', { ascending: false });
-      if (!error && data && data.length > 0) {
-        return res.json(data);
-      }
+      if (!error && data && data.length > 0) return res.json(data);
     }
     return res.json(mockData.blogPosts);
-  } catch (err) {
-    return res.json(mockData.blogPosts);
-  }
+  } catch (err) { res.json(mockData.blogPosts); }
 });
 
-// GET /api/blog/:slug
 app.get('/api/blog/:slug', async (req, res) => {
   const { slug } = req.params;
   try {
     if (supabase) {
       const { data, error } = await supabase.from('blog_posts').select('*').eq('slug', slug).single();
-      if (!error && data) {
-        return res.json(data);
-      }
+      if (!error && data) return res.json(data);
     }
     const post = mockData.blogPosts.find(b => b.slug === slug);
     if (post) return res.json(post);
-    return res.status(404).json({ message: 'Blog post not found' });
+    return res.status(404).json({ message: 'Post not found' });
   } catch (err) {
     const post = mockData.blogPosts.find(b => b.slug === slug);
     if (post) return res.json(post);
-    return res.status(404).json({ message: 'Blog post not found' });
+    return res.status(404).json({ message: 'Post not found' });
   }
 });
 
-// POST /api/contact
+// ── Contact / Quotes / Orders ─────────────────────────────────────────────────
 app.post('/api/contact', async (req, res) => {
-  const { name, email, phone, subject, message } = req.body;
-
-  if (!name || !email || !message) {
-    return res.status(400).json({ success: false, message: 'Name, email, and message are required.' });
-  }
-
-  const payload = {
-    id: `msg-${Date.now()}`,
-    name,
-    email,
-    phone: phone || '',
-    subject: subject || 'General Inquiry',
-    message,
-    created_at: new Date().toISOString()
-  };
-
+  const { name, email, subject, message } = req.body;
+  if (!name || !email || !message) return res.status(400).json({ success: false, message: 'Missing fields.' });
+  const record = { id: `msg-${Date.now()}`, name, email, subject, message, createdAt: new Date().toISOString() };
+  localContactMessages.push(record);
   try {
-    if (supabase) {
-      const { error } = await supabase.from('contact_messages').insert([payload]);
-      if (error) console.error('Supabase contact insert error:', error.message);
-    }
-  } catch (err) {
-    console.error('Contact submit error:', err);
-  }
-
-  localContactMessages.push(payload);
-  console.log('📬 Contact Submission Received:', payload);
-
-  return res.json({
-    success: true,
-    message: 'Thank you for reaching out to Ceylon Eco Fresh Infinity (CEFI). Our export & customer care team will respond within 24 hours.'
-  });
+    if (supabase) await supabase.from('contact_messages').insert([record]);
+  } catch (e) {}
+  return res.json({ success: true, message: 'Message received!' });
 });
 
-// POST /api/newsletter
-app.post('/api/newsletter', async (req, res) => {
+app.post('/api/subscribe', async (req, res) => {
   const { email } = req.body;
-
-  if (!email || !email.includes('@')) {
-    return res.status(400).json({ success: false, message: 'Please provide a valid email address.' });
-  }
-
-  const payload = {
-    id: `sub-${Date.now()}`,
-    email,
-    subscribed_at: new Date().toISOString()
-  };
-
+  if (!email) return res.status(400).json({ success: false, message: 'Email required.' });
+  if (localSubscribers.find(s => s.email === email)) return res.json({ success: true, message: 'Already subscribed!' });
+  localSubscribers.push({ email, subscribedAt: new Date().toISOString() });
   try {
-    if (supabase) {
-      await supabase.from('newsletter_subscribers').insert([payload]);
-    }
-  } catch (err) {
-    // ignore duplicate key or fallback
-  }
-
-  if (!localSubscribers.includes(email)) {
-    localSubscribers.push(email);
-  }
-
-  console.log('📧 Newsletter Subscription:', email);
-
-  return res.json({
-    success: true,
-    message: 'Welcome to the CEFI Inner Circle! You are subscribed to new harvest updates and export offers.'
-  });
+    if (supabase) await supabase.from('newsletter_subscribers').insert([{ email }]);
+  } catch (e) {}
+  return res.json({ success: true, message: 'Subscribed successfully!' });
 });
 
-// POST /api/quotes (Wholesale / Export Quote Requests)
 app.post('/api/quotes', async (req, res) => {
-  const { productName, companyName, contactPerson, email, phone, estimatedQuantity, targetDestination, notes } = req.body;
-
-  if (!companyName || !contactPerson || !email || !estimatedQuantity) {
-    return res.status(400).json({ success: false, message: 'Please fill in company name, contact person, email, and estimated quantity.' });
-  }
-
-  const payload = {
-    id: `quote-${Date.now()}`,
-    product_name: productName || 'General Export Portfolio',
-    company_name: companyName,
-    contact_person: contactPerson,
-    email,
-    phone: phone || '',
-    estimated_quantity: estimatedQuantity,
-    target_destination: targetDestination || 'International',
-    additional_notes: notes || '',
-    created_at: new Date().toISOString()
-  };
-
+  const { name, email, company, product, quantity, message } = req.body;
+  const record = { id: `quote-${Date.now()}`, name, email, company, product, quantity, message, createdAt: new Date().toISOString() };
+  localQuotes.push(record);
   try {
-    if (supabase) {
-      await supabase.from('quote_requests').insert([payload]);
-    }
-  } catch (err) {
-    console.error('Quote insert error:', err);
-  }
-
-  localQuotes.push(payload);
-  console.log('📋 Wholesale Quote Request:', payload);
-
-  return res.json({
-    success: true,
-    quoteId: payload.id,
-    message: 'Your export quote inquiry has been submitted. A dedicated CEFI international trade representative will contact you with pricing & specifications.'
-  });
+    if (supabase) await supabase.from('quote_requests').insert([record]);
+  } catch (e) {}
+  return res.json({ success: true, message: 'Quote request received!' });
 });
 
-// POST /api/orders
 app.post('/api/orders', async (req, res) => {
   const { customer, items, total, paymentMethod } = req.body;
-
-  if (!customer || !items || items.length === 0) {
-    return res.status(400).json({ success: false, message: 'Invalid order payload.' });
-  }
-
+  if (!customer || !items || !total) return res.status(400).json({ success: false, message: 'Invalid order data.' });
   const orderId = `CEFI-ORD-${Math.floor(100000 + Math.random() * 900000)}`;
-
-  const orderRecord = {
-    orderId,
-    customer,
-    items,
-    total,
-    paymentMethod: paymentMethod || 'Card / PayHere',
-    status: 'Confirmed',
-    createdAt: new Date().toISOString()
-  };
-
+  const orderRecord = { orderId, customer, items, total, paymentMethod: paymentMethod || 'Card / PayHere', status: 'Confirmed', createdAt: new Date().toISOString() };
   localOrders.push(orderRecord);
-  console.log('🛒 New Order Placed:', orderId, 'Total:', total);
-
-  return res.json({
-    success: true,
-    orderId,
-    message: 'Order placed successfully! Order confirmation has been dispatched.'
-  });
+  console.log('🛒 New Order:', orderId, 'Total:', total);
+  return res.json({ success: true, orderId, message: 'Order placed successfully!' });
 });
 
-// Start Server
+// ── Start Server ──────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`🚀 CEFI Backend REST API running on http://localhost:${PORT}`);
 });

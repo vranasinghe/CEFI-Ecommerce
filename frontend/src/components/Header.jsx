@@ -64,26 +64,14 @@ export default function Header({ onOpenQuoteModal }) {
           
           {/* Brand Logo */}
           <Link to="/" className="flex items-center space-x-3 group">
-            {/* Logo Mark: Palm tree on crescent in green/gold */}
-            <div className="relative w-10 h-10 rounded-full bg-cefi-green p-1.5 shadow-md flex items-center justify-center border-2 border-cefi-gold transform group-hover:scale-105 transition-transform">
-              <svg viewBox="0 0 100 100" className="w-full h-full text-cefi-gold fill-current">
-                {/* Crescent Moon */}
-                <path d="M 50,10 A 40,40 0 1,0 90,50 A 30,30 0 1,1 50,10 Z" fill="#C9971C" />
-                {/* Palm Tree */}
-                <path d="M48 78 L52 78 L51 45 L49 45 Z" fill="#FFFFFF" />
-                <path d="M50 45 C40 35 25 35 20 40 C30 45 42 45 50 47 C58 45 70 45 80 40 C75 35 60 35 50 45 Z" fill="#FFFFFF" />
-                <path d="M50 45 C45 30 35 20 30 20 C35 30 45 40 50 47 C55 40 65 30 70 20 C65 20 55 30 50 45 Z" fill="#C9971C" />
-              </svg>
+            {/* Logo Mark */}
+            <div className="relative w-12 h-12 transform group-hover:scale-105 transition-transform">
+              <img src="/logo.png" alt="CEFI Logo" className="w-full h-full object-contain drop-shadow-md" />
             </div>
             
-            {/* Wordmark */}
-            <div className="flex flex-col">
-              <span className="font-serif text-2xl font-bold tracking-tight text-cefi-green leading-none">
-                Cefi
-              </span>
-              <span className="text-[9px] uppercase font-sans tracking-widest text-cefi-gold font-semibold mt-0.5">
-                Ceylon Eco Fresh
-              </span>
+            {/* Wordmark Image */}
+            <div className="relative h-10 w-48 sm:w-56 transform group-hover:scale-[1.02] transition-transform">
+              <img src="/logo-text.png" alt="CEFI Wordmark" className="w-full h-full object-contain object-left drop-shadow-sm" />
             </div>
           </Link>
 

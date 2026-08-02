@@ -3,14 +3,20 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  }
+
   body {
+    font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
     background-color: #FBF9F5;
     color: #2D251E;
     overflow-x: hidden;
   }
 
-  h1, h2, h3, h4, .font-heading {
-    font-family: 'Playfair Display', Georgia, serif;
+  h1, h2, h3, h4, h5, h6, .font-heading {
+    font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+    font-weight: 700;
   }
 }
 
@@ -44,4 +50,44 @@
 
 .animate-float-delayed {
   animation: floatReverse 7s ease-in-out 1s infinite;
+}
+
+@keyframes pulseSoft {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.015); }
+}
+
+.animate-pulse-soft {
+  animation: pulseSoft 8s ease-in-out infinite;
+}
+
+/* Scroll-triggered section reveal (used by <Reveal>) */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Category carousel slide transition */
+@keyframes enterFromRight {
+  from { opacity: 0; transform: translateX(28px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes enterFromLeft {
+  from { opacity: 0; transform: translateX(-28px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.animate-enter-from-right {
+  animation: enterFromRight 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-enter-from-left {
+  animation: enterFromLeft 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }

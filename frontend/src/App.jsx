@@ -21,6 +21,8 @@ import BlogPostPage from './pages/BlogPostPage';
 import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
 import AccountPage from './pages/AccountPage';
+import AdminDashboard from './pages/AdminDashboard';
+import AdminProductForm from './pages/AdminProductForm';
 
 // Scroll To Top on route change
 function ScrollToTop() {
@@ -65,6 +67,11 @@ export default function App() {
                 <Route path="/cart" element={<CartPage />} />
                 <Route path="/checkout" element={<CheckoutPage />} />
                 <Route path="/account" element={<AccountPage />} />
+                
+                {/* Admin Routes - full screen, no header/footer */}
+                <Route path="/admin" element={<AdminDashboard />} />
+                <Route path="/admin/products/new" element={<AdminProductForm mode="add" />} />
+                <Route path="/admin/products/edit/:id" element={<AdminProductForm mode="edit" />} />
               </Routes>
             </main>
 
