@@ -171,15 +171,15 @@ export default function Footer() {
           <div className="space-y-2.5 text-xs text-emerald-200/80">
             <div className="flex items-start space-x-2.5">
               <MapPin className="w-4 h-4 text-cefi-gold shrink-0 mt-0.5" />
-              <span>No. 147, Havelock Rd, Colombo 05, Sri Lanka</span>
+              <span>No. 278/1/A, Meegasmulla. Dedigamuwa.</span>
             </div>
             <div className="flex items-center space-x-2.5">
               <Phone className="w-4 h-4 text-cefi-gold shrink-0" />
-              <span>+94 11 727 1692 / +94 77 727 1692</span>
+              <span>+94714634485</span>
             </div>
             <div className="flex items-center space-x-2.5">
               <Mail className="w-4 h-4 text-cefi-gold shrink-0" />
-              <span>info@cefi.lk / export@cefi.lk</span>
+              <span>ceylonecofreshinfinity@gmail.com</span>
             </div>
           </div>
 

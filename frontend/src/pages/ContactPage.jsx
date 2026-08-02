@@ -66,8 +66,7 @@ export default function ContactPage() {
                 <MapPin className="w-5 h-5 text-cefi-gold shrink-0 mt-0.5" />
                 <div>
                   <strong className="block text-white text-sm">Primary Address</strong>
-                  <span>No. 147, Havelock Rd, Colombo 05, Sri Lanka</span>
-                  <span className="block text-[11px] text-emerald-300 mt-1">Branch: No. 233A, Kaduwela Rd, Koswatte, Battaramulla</span>
+                  <span>No. 278/1/A, Meegasmulla. Dedigamuwa.</span>
                 </div>
               </div>
 
@@ -75,7 +74,7 @@ export default function ContactPage() {
                 <Phone className="w-5 h-5 text-cefi-gold shrink-0" />
                 <div>
                   <strong className="block text-white text-sm">Direct Phone & WhatsApp</strong>
-                  <span>+94 11 727 1692 / +94 77 727 1692</span>
+                  <span>+94714634485</span>
                 </div>
               </div>
 
@@ -83,7 +82,7 @@ export default function ContactPage() {
                 <Mail className="w-5 h-5 text-cefi-gold shrink-0" />
                 <div>
                   <strong className="block text-white text-sm">Email Correspondence</strong>
-                  <span>info@cefi.lk / export@cefi.lk</span>
+                  <span>ceylonecofreshinfinity@gmail.com</span>
                 </div>
               </div>
 
@@ -91,7 +90,7 @@ export default function ContactPage() {
                 <Clock className="w-5 h-5 text-cefi-gold shrink-0" />
                 <div>
                   <strong className="block text-white text-sm">Business Hours</strong>
-                  <span>Monday – Saturday: 8:30 AM – 5:30 PM (IST / UTC+5:30)</span>
+                  <span>9.00 am - 8.30pm</span>
                 </div>
               </div>
             </div>
