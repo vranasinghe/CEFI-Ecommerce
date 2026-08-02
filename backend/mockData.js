@@ -4,11 +4,19 @@
 const categories = [
   {
     id: "cat-1",
-    name: "Herbal",
-    slug: "herbal",
+    name: "Herbal Leaves",
+    slug: "herbal-leaves",
     description: "Traditional Sri Lankan ayurvedic herbs, wellness infusions, and immunity boosters harvested from organic estates.",
     image_url: "https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=800&q=80",
     itemCount: 8
+  },
+  {
+    id: "cat-1b",
+    name: "Herbal Flowers",
+    slug: "herbal-flowers",
+    description: "Dried herbal flowers used for infusions and natural remedies.",
+    image_url: "https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=800&q=80",
+    itemCount: 0
   },
   {
     id: "cat-2",
@@ -195,8 +203,8 @@ const products = [
   {
     id: "prod-8",
     category_id: "cat-1",
-    category_slug: "herbal",
-    category_name: "Herbal",
+    category_slug: "herbal-leaves",
+    category_name: "Herbal Leaves",
     name: "Gotu Kola (Centella Asiatica) Herbal Tea Elixir",
     slug: "gotu-kola-herbal-tea-elixir",
     short_description: "Traditional Sri Lankan memory and vitality herb formulated into a refreshing tisane.",
@@ -214,8 +222,8 @@ const products = [
   {
     id: "prod-9",
     category_id: "cat-1",
-    category_slug: "herbal",
-    category_name: "Herbal",
+    category_slug: "herbal-leaves",
+    category_name: "Herbal Leaves",
     name: "Organic Moringa Leaf Powder (Superfood Grade)",
     slug: "organic-moringa-leaf-powder",
     short_description: "Nutrient-dense 'Miracle Tree' leaf powder packed with vitamins, iron, and amino acids.",

@@ -13,7 +13,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function updateCategories() {
   const updates = [
-    { slug: 'herbal', image_url: '/images/cat-herbal.png' },
+    { slug: 'herbal-leaves', image_url: '/images/cat-herbal.png' },
     { slug: 'tea', image_url: '/images/cat-tea.png' },
     { slug: 'spices', image_url: '/images/cat-spices.png' },
     { slug: 'vegetables', image_url: '/images/cat-vegetables.png' },
