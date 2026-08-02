@@ -107,12 +107,7 @@ export default function HomePage({ onOpenQuoteModal }) {
                   </div>
                 </Link>
 
-                <button
-                  onClick={onOpenQuoteModal}
-                  className="px-8 py-4 bg-white border-2 border-cefi-green text-cefi-green hover:bg-cefi-green hover:text-white rounded-full font-serif font-semibold text-base shadow-sm transition-all"
-                >
-                  Export / Bulk Quotation
-                </button>
+
               </div>
 
               {/* Quick Trust Statistics */}
