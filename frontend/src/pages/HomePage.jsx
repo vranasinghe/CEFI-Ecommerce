@@ -77,10 +77,10 @@ export default function HomePage({ onOpenQuoteModal }) {
         <div className="absolute bottom-10 right-10 w-48 h-48 bg-cefi-green/10 rounded-full blur-3xl pointer-events-none"></div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             
             {/* Left Column: Typography & CTAs */}
-            <div className="lg:col-span-7 space-y-6 z-10">
+            <div className="lg:col-span-5 space-y-6 z-10">
               
               <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-cefi-gold/15 text-cefi-earth text-xs font-bold tracking-wide">
                 <Sparkles className="w-3.5 h-3.5 text-cefi-gold" />
@@ -129,7 +129,7 @@ export default function HomePage({ onOpenQuoteModal }) {
             </div>
 
             {/* Right Column: Hero Graphic Composition */}
-            <div className="lg:col-span-5 relative flex items-center justify-center h-[400px] sm:h-[500px]">
+            <div className="lg:col-span-7 relative flex items-center justify-center h-[480px] sm:h-[600px] lg:h-[680px]">
               
               {/* Main Hero Feature Image */}
               <div className="relative w-full h-full z-10 flex justify-center items-center">
@@ -137,6 +137,7 @@ export default function HomePage({ onOpenQuoteModal }) {
                   src="/images/hero-image.png"
                   alt="Ceylon Spices & Natural Products"
                   className="w-full h-full object-contain drop-shadow-2xl hover:scale-105 transition-transform duration-700"
+                  style={{ maxHeight: '660px', transform: 'scale(1.08)' }}
                 />
               </div>
 
