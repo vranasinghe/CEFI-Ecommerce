@@ -39,8 +39,8 @@ export default function AboutPage() {
           <div className="lg:col-span-6">
             <div className="rounded-3xl overflow-hidden shadow-2xl border-4 border-white aspect-[4/3]">
               <img
-                src="https://images.unsplash.com/photo-1597481499750-3e6b22637e12?auto=format&fit=crop&w=1000&q=80"
-                alt="Ceylon Tea Estates"
+                src="/images/about-image.jpg"
+                alt="Ceylon Spices and Natural Products"
                 className="w-full h-full object-cover"
               />
             </div>
