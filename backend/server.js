@@ -382,6 +382,17 @@ app.post('/api/orders', async (req, res) => {
 });
 
 // ── Start Server ──────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`🚀 CEFI Backend REST API running on http://localhost:${PORT}`);
-});
+// Start Server locally
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`CEFI Backend REST API running on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
+
+module.exports.config = {
+  api: {
+    bodyParser: false,
+  },
+};
