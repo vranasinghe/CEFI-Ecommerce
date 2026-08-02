@@ -15,7 +15,7 @@ const categories = [
     name: "Herbal Flowers",
     slug: "herbal-flowers",
     description: "Dried herbal flowers used for infusions and natural remedies.",
-    image_url: "https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=800&q=80",
+    image_url: "/images/cat-herbal-flowers.png",
     itemCount: 0
   },
   {
