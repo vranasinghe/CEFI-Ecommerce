@@ -159,14 +159,14 @@ export default function HomePage({ onOpenQuoteModal }) {
             </div>
 
             {/* Right Column: Hero Graphic Composition */}
-            <div className="lg:col-span-7 relative flex items-center justify-center h-[320px] sm:h-[500px] lg:h-[920px]">
+            <div className="lg:col-span-7 relative flex items-center justify-center h-[260px] sm:h-[420px] lg:h-[920px]">
               
               {/* Main Hero Feature Image */}
-              <div className="relative w-full h-full z-10 flex justify-center items-center overflow-visible">
+              <div className="relative w-full h-full z-10 flex justify-center items-center overflow-hidden lg:overflow-visible">
                 <img
                   src="/images/hero-image.png"
                   alt="Ceylon Spices & Natural Products"
-                  className="w-full h-full object-contain drop-shadow-2xl hover:scale-110 transition-transform duration-700 scale-110 md:scale-125 lg:scale-[1.38] origin-center"
+                  className="w-full h-full object-contain drop-shadow-2xl hover:scale-105 transition-transform duration-700 scale-100 md:scale-110 lg:scale-[1.38] origin-center"
                   style={{ maxHeight: '920px' }}
                 />
               </div>
@@ -179,45 +179,45 @@ export default function HomePage({ onOpenQuoteModal }) {
 
       {/* 2.5 Features / Trust Badges */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-30">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 flex flex-col md:flex-row items-center justify-between gap-4 divide-y md:divide-y-0 md:divide-x divide-gray-200">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 grid grid-cols-2 md:grid-cols-4 gap-4 divide-gray-200">
           
-          <div className="group flex items-center space-x-4 px-4 w-full md:w-1/4 pt-4 md:pt-0 first:pt-0 cursor-default">
-            <div className="w-14 h-14 shrink-0 overflow-hidden rounded-full bg-gray-100 flex items-center justify-center transition-colors duration-300 group-hover:bg-cefi-green">
-              <img src="/icon-truck.png" alt="Delivery Icon" className="w-8 h-8 object-contain transition-all duration-300 group-hover:brightness-0 group-hover:invert" />
+          <div className="group flex items-center space-x-3 cursor-default">
+            <div className="w-11 h-11 shrink-0 overflow-hidden rounded-full bg-gray-100 flex items-center justify-center transition-colors duration-300 group-hover:bg-cefi-green">
+              <img src="/icon-truck.png" alt="Delivery Icon" className="w-6 h-6 object-contain transition-all duration-300 group-hover:brightness-0 group-hover:invert" />
             </div>
             <div>
-              <h4 className="font-sans font-bold text-cefi-earth text-[13px] md:text-sm transition-colors group-hover:text-cefi-green">Worldwide Delivery</h4>
-              <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">Fresh products delivered across the globe.</p>
+              <h4 className="font-sans font-bold text-cefi-earth text-[12px] md:text-sm transition-colors group-hover:text-cefi-green">Worldwide Delivery</h4>
+              <p className="text-[10px] text-gray-500 mt-0.5 leading-tight hidden sm:block">Fresh products delivered across the globe.</p>
             </div>
           </div>
 
-          <div className="group flex items-center space-x-4 px-4 w-full md:w-1/4 pt-4 md:pt-0 cursor-default">
-            <div className="w-14 h-14 shrink-0 overflow-hidden rounded-full bg-gray-100 flex items-center justify-center transition-colors duration-300 group-hover:bg-cefi-green">
-              <img src="/icon-award.png" alt="Award Icon" className="w-8 h-8 object-contain transition-all duration-300 group-hover:brightness-0 group-hover:invert" />
+          <div className="group flex items-center space-x-3 cursor-default">
+            <div className="w-11 h-11 shrink-0 overflow-hidden rounded-full bg-gray-100 flex items-center justify-center transition-colors duration-300 group-hover:bg-cefi-green">
+              <img src="/icon-award.png" alt="Award Icon" className="w-6 h-6 object-contain transition-all duration-300 group-hover:brightness-0 group-hover:invert" />
             </div>
             <div>
-              <h4 className="font-sans font-bold text-cefi-earth text-[13px] md:text-sm transition-colors group-hover:text-cefi-green">Premium Quality</h4>
-              <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">Every product is quality-checked and sealed for freshness.</p>
+              <h4 className="font-sans font-bold text-cefi-earth text-[12px] md:text-sm transition-colors group-hover:text-cefi-green">Premium Quality</h4>
+              <p className="text-[10px] text-gray-500 mt-0.5 leading-tight hidden sm:block">Every product is quality-checked and sealed for freshness.</p>
             </div>
           </div>
 
-          <div className="group flex items-center space-x-4 px-4 w-full md:w-1/4 pt-4 md:pt-0 cursor-default">
-            <div className="w-14 h-14 shrink-0 overflow-hidden rounded-full bg-gray-100 flex items-center justify-center transition-colors duration-300 group-hover:bg-cefi-green">
-              <img src="/icon-card.png" alt="Secure Checkout Icon" className="w-8 h-8 object-contain transition-all duration-300 group-hover:brightness-0 group-hover:invert" />
+          <div className="group flex items-center space-x-3 cursor-default">
+            <div className="w-11 h-11 shrink-0 overflow-hidden rounded-full bg-gray-100 flex items-center justify-center transition-colors duration-300 group-hover:bg-cefi-green">
+              <img src="/icon-card.png" alt="Secure Checkout Icon" className="w-6 h-6 object-contain transition-all duration-300 group-hover:brightness-0 group-hover:invert" />
             </div>
             <div>
-              <h4 className="font-sans font-bold text-cefi-earth text-[13px] md:text-sm transition-colors group-hover:text-cefi-green">Secure Checkout</h4>
-              <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">Trusted, secure and hassle-free payments.</p>
+              <h4 className="font-sans font-bold text-cefi-earth text-[12px] md:text-sm transition-colors group-hover:text-cefi-green">Secure Checkout</h4>
+              <p className="text-[10px] text-gray-500 mt-0.5 leading-tight hidden sm:block">Trusted, secure and hassle-free payments.</p>
             </div>
           </div>
 
-          <div className="group flex items-center space-x-4 px-4 w-full md:w-1/4 pt-4 md:pt-0 cursor-default">
-            <div className="w-14 h-14 shrink-0 overflow-hidden rounded-full bg-gray-100 flex items-center justify-center transition-colors duration-300 group-hover:bg-cefi-green">
-              <img src="/icon-headset.png" alt="Support Icon" className="w-8 h-8 object-contain transition-all duration-300 group-hover:brightness-0 group-hover:invert" />
+          <div className="group flex items-center space-x-3 cursor-default">
+            <div className="w-11 h-11 shrink-0 overflow-hidden rounded-full bg-gray-100 flex items-center justify-center transition-colors duration-300 group-hover:bg-cefi-green">
+              <img src="/icon-headset.png" alt="Support Icon" className="w-6 h-6 object-contain transition-all duration-300 group-hover:brightness-0 group-hover:invert" />
             </div>
             <div>
-              <h4 className="font-sans font-bold text-cefi-earth text-[13px] md:text-sm transition-colors group-hover:text-cefi-green">Real Support</h4>
-              <p className="text-[11px] text-gray-500 mt-0.5 leading-tight">Friendly, human help available at all times.</p>
+              <h4 className="font-sans font-bold text-cefi-earth text-[12px] md:text-sm transition-colors group-hover:text-cefi-green">Real Support</h4>
+              <p className="text-[10px] text-gray-500 mt-0.5 leading-tight hidden sm:block">Friendly, human help available at all times.</p>
             </div>
           </div>
 
@@ -241,24 +241,24 @@ export default function HomePage({ onOpenQuoteModal }) {
           <button
             onClick={prevCategory}
             aria-label="Previous Category"
-            className="absolute -left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-cefi-earth hover:bg-cefi-green text-white rounded-full flex items-center justify-center shadow-lg transition-all"
+            className="absolute left-0 sm:-left-4 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-10 sm:h-10 bg-cefi-earth hover:bg-cefi-green text-white rounded-full flex items-center justify-center shadow-lg transition-all"
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
 
           <button
             onClick={nextCategory}
             aria-label="Next Category"
-            className="absolute -right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-cefi-earth hover:bg-cefi-green text-white rounded-full flex items-center justify-center shadow-lg transition-all"
+            className="absolute right-0 sm:-right-4 top-1/2 -translate-y-1/2 z-20 w-8 h-8 sm:w-10 sm:h-10 bg-cefi-earth hover:bg-cefi-green text-white rounded-full flex items-center justify-center shadow-lg transition-all"
           >
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
 
           {/* Grid of Categories */}
           <div className="overflow-hidden px-2">
             <div
               key={categoryScrollIndex}
-              className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 ${
+              className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 ${
                 carouselDirection === 'right' ? 'animate-enter-from-right' : 'animate-enter-from-left'
               }`}
             >
@@ -286,7 +286,7 @@ export default function HomePage({ onOpenQuoteModal }) {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {featuredProducts.slice(0, 4).map((product, i) => (
             <Reveal key={product.id} delay={i * 90}>
               <ProductCard product={product} onOpenQuoteModal={onOpenQuoteModal} />
