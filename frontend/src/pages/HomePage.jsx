@@ -17,7 +17,17 @@ export default function HomePage({ onOpenQuoteModal }) {
     // Fetch categories
     fetch('/api/categories')
       .then(res => res.json())
-      .then(data => setCategories(data))
+      .then(data => {
+        const order = ['herbal-leaves', 'herbal-flowers', 'tea', 'spices', 'fruits', 'vegetables'];
+        const sortedData = data.sort((a, b) => {
+          let indexA = order.indexOf(a.slug);
+          let indexB = order.indexOf(b.slug);
+          if (indexA === -1) indexA = 999;
+          if (indexB === -1) indexB = 999;
+          return indexA - indexB;
+        });
+        setCategories([...sortedData]);
+      })
       .catch(() => {});
 
     // Fetch featured products
