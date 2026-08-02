@@ -73,20 +73,8 @@ export default function HomePage({ onOpenQuoteModal }) {
       <section className="relative overflow-hidden pt-2 pb-8 md:pt-4 md:pb-16 bg-gradient-to-b from-cefi-cream via-cefi-cream to-white">
         
         {/* Faint botanical leaf watermark - left side */}
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-64 h-64 opacity-[0.07] pointer-events-none select-none" aria-hidden="true">
-          <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-            <path d="M100 180 C60 160 20 120 30 70 C40 20 90 10 120 30 C150 50 170 100 150 140 C130 170 100 180 100 180Z" fill="#1F532E" />
-            <path d="M100 180 L100 50" stroke="#1F532E" strokeWidth="2"/>
-            <path d="M100 120 C80 100 60 95 50 80" stroke="#1F532E" strokeWidth="1.5"/>
-            <path d="M100 100 C120 80 140 78 150 65" stroke="#1F532E" strokeWidth="1.5"/>
-            <path d="M100 140 C75 125 55 118 45 102" stroke="#1F532E" strokeWidth="1.5"/>
-          </svg>
-        </div>
-        <div className="absolute left-8 bottom-8 w-40 h-40 opacity-[0.05] pointer-events-none select-none rotate-45" aria-hidden="true">
-          <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-            <path d="M100 180 C60 160 20 120 30 70 C40 20 90 10 120 30 C150 50 170 100 150 140 C130 170 100 180 100 180Z" fill="#1F532E" />
-            <path d="M100 180 L100 50" stroke="#1F532E" strokeWidth="2"/>
-          </svg>
+        <div className="absolute left-0 bottom-0 w-72 h-auto opacity-80 pointer-events-none select-none z-0" aria-hidden="true">
+          <img src="/images/leaf-watermark.png" alt="" className="w-full h-full object-contain object-bottom-left" />
         </div>
 
         {/* Decorative Floating Botanical Details */}
