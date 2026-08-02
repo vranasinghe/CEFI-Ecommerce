@@ -30,10 +30,28 @@ export default function HomePage({ onOpenQuoteModal }) {
       })
       .catch(() => {});
 
-    // Fetch featured products
-    fetch('/api/products?featured=true')
+    // Fetch products and pick 1 from each of the 4 main categories
+    fetch('/api/products')
       .then(res => res.json())
-      .then(data => setFeaturedProducts(data))
+      .then(data => {
+        const targetCategories = ['herbal-leaves', 'herbal-flowers', 'tea', 'spices'];
+        const selectedProducts = [];
+        
+        targetCategories.forEach(catSlug => {
+          const product = data.find(p => p.category_slug === catSlug);
+          if (product) {
+            selectedProducts.push(product);
+          }
+        });
+        
+        // Fill up to 4 if any categories are empty
+        if (selectedProducts.length < 4) {
+          const others = data.filter(p => !selectedProducts.find(sp => sp.id === p.id));
+          selectedProducts.push(...others.slice(0, 4 - selectedProducts.length));
+        }
+        
+        setFeaturedProducts(selectedProducts);
+      })
       .catch(() => {});
   }, []);
 
@@ -67,13 +85,13 @@ export default function HomePage({ onOpenQuoteModal }) {
   };
 
   return (
-    <div className="space-y-20 pb-16">
+    <div className="space-y-12 pb-10 -mt-2">
       
       {/* 2. Hero Section */}
-      <section className="relative overflow-hidden pt-2 pb-8 md:pt-4 md:pb-16 bg-gradient-to-b from-cefi-cream via-cefi-cream to-white">
+      <section className="relative overflow-hidden pt-0 pb-6 md:pt-0 md:pb-10 bg-gradient-to-b from-cefi-cream via-cefi-cream to-white">
         
         {/* Faint botanical leaf watermark - left side */}
-        <div className="absolute left-0 bottom-0 w-72 h-auto opacity-80 pointer-events-none select-none z-0" aria-hidden="true">
+        <div className="absolute left-0 bottom-0 w-[480px] h-auto opacity-80 pointer-events-none select-none z-0" aria-hidden="true">
           <img src="/images/leaf-watermark.png" alt="" className="w-full h-full object-contain object-bottom-left" />
         </div>
 
@@ -101,13 +119,7 @@ export default function HomePage({ onOpenQuoteModal }) {
                 <span className="text-cefi-green italic font-normal">Grown for the World.</span>
               </h1>
 
-              {/* Golden divider with leaf */}
-              <div className="flex items-center space-x-3">
-                <div className="h-px w-12 bg-cefi-gold"></div>
-                <svg className="w-5 h-5 text-cefi-gold" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10 2C6 2 3 6 3 10c0 3 2 5.5 4.5 6.5L10 18l2.5-1.5C15 15.5 17 13 17 10c0-4-3-8-7-8z"/>
-                </svg>
-              </div>
+
 
               <p className="text-base sm:text-lg text-cefi-earth/80 max-w-xl font-sans leading-relaxed">
                 Premium Sri Lankan tea, authentic True Cinnamon, rare spices, sun-dried tropical fruits, and organic agricultural produce processed and exported under world-class quality standards.
@@ -128,23 +140,17 @@ export default function HomePage({ onOpenQuoteModal }) {
               {/* Quick Trust Statistics with icons */}
               <div className="pt-6 grid grid-cols-3 gap-4 border-t border-cefi-cream-dark/60 max-w-lg">
                 <div className="flex flex-col items-start space-y-1">
-                  <div className="w-8 h-8 rounded-full border border-cefi-green/30 flex items-center justify-center mb-1">
-                    <svg className="w-4 h-4 text-cefi-green" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2C6 2 3 6 3 10c0 3 2 5.5 4.5 6.5L10 18l2.5-1.5C15 15.5 17 13 17 10c0-4-3-8-7-8z"/></svg>
-                  </div>
+
                   <span className="font-serif font-bold text-2xl text-cefi-green">100%</span>
                   <span className="text-xs text-gray-500 font-medium">Pure Ceylon Origin</span>
                 </div>
                 <div className="flex flex-col items-start space-y-1">
-                  <div className="w-8 h-8 rounded-full border border-cefi-green/30 flex items-center justify-center mb-1">
-                    <svg className="w-4 h-4 text-cefi-green" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20"/></svg>
-                  </div>
+
                   <span className="font-serif font-bold text-2xl text-cefi-green">40+</span>
                   <span className="text-xs text-gray-500 font-medium">Global Markets</span>
                 </div>
                 <div className="flex flex-col items-start space-y-1">
-                  <div className="w-8 h-8 rounded-full border border-cefi-green/30 flex items-center justify-center mb-1">
-                    <svg className="w-4 h-4 text-cefi-green" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
-                  </div>
+
                   <span className="font-serif font-bold text-2xl text-cefi-green">300+</span>
                   <span className="text-xs text-gray-500 font-medium">Farmer Outgrowers</span>
                 </div>
@@ -153,7 +159,7 @@ export default function HomePage({ onOpenQuoteModal }) {
             </div>
 
             {/* Right Column: Hero Graphic Composition */}
-            <div className="lg:col-span-7 relative flex items-center justify-center h-[560px] sm:h-[720px] lg:h-[820px]">
+            <div className="lg:col-span-7 relative flex items-center justify-center h-[620px] sm:h-[800px] lg:h-[920px]">
               
               {/* Main Hero Feature Image */}
               <div className="relative w-full h-full z-10 flex justify-center items-center overflow-visible">
@@ -161,7 +167,7 @@ export default function HomePage({ onOpenQuoteModal }) {
                   src="/images/hero-image.png"
                   alt="Ceylon Spices & Natural Products"
                   className="w-full h-full object-contain drop-shadow-2xl hover:scale-105 transition-transform duration-700"
-                  style={{ maxHeight: '820px', transform: 'scale(1.22)' }}
+                  style={{ maxHeight: '920px', transform: 'scale(1.38)' }}
                 />
               </div>
 
@@ -172,7 +178,7 @@ export default function HomePage({ onOpenQuoteModal }) {
       </section>
 
       {/* 2.5 Features / Trust Badges */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-10 relative z-30">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-30">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 flex flex-col md:flex-row items-center justify-between gap-4 divide-y md:divide-y-0 md:divide-x divide-gray-200">
           
           <div className="group flex items-center space-x-4 px-4 w-full md:w-1/4 pt-4 md:pt-0 first:pt-0 cursor-default">
@@ -220,7 +226,7 @@ export default function HomePage({ onOpenQuoteModal }) {
 
       {/* 3. "Explore our Collection" — Category Cards Row */}
       <Reveal as="section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center space-y-2 mb-10">
+        <div className="text-center space-y-2 mb-8">
           <h2 className="font-serif font-bold text-3xl sm:text-4xl text-cefi-earth">
             Explore our Collection
           </h2>
@@ -269,7 +275,7 @@ export default function HomePage({ onOpenQuoteModal }) {
 
       {/* Featured Products Showcase */}
       <Reveal as="section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row items-start md:items-end justify-between mb-8 pb-4 border-b border-gray-200">
+        <div className="flex flex-col md:flex-row items-start md:items-end justify-between mb-6 pb-4 border-b border-gray-200">
           <div>
             <span className="text-xs font-bold uppercase tracking-wider text-cefi-gold">Handpicked Harvests</span>
             <h2 className="font-serif font-bold text-3xl text-cefi-earth mt-1">Featured Ceylon Products</h2>
@@ -290,7 +296,7 @@ export default function HomePage({ onOpenQuoteModal }) {
       </Reveal>
 
       {/* 4. "Our Story" Section */}
-      <section className="bg-cefi-cream py-16 border-y border-cefi-cream-dark/60">
+      <section className="bg-cefi-cream py-12 border-y border-cefi-cream-dark/60">
         <Reveal as="div" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             
@@ -355,7 +361,7 @@ export default function HomePage({ onOpenQuoteModal }) {
 
       {/* 5. Why Choose CEFI Section */}
       <Reveal as="section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center max-w-2xl mx-auto mb-12">
+        <div className="text-center max-w-2xl mx-auto mb-8">
           <span className="text-xs font-bold uppercase tracking-wider text-cefi-gold">The CEFI Advantage</span>
           <h2 className="font-serif font-bold text-3xl text-cefi-earth mt-1">Why Choose CEFI?</h2>
         </div>
@@ -407,7 +413,7 @@ export default function HomePage({ onOpenQuoteModal }) {
 
       {/* 6. Newsletter / "Join the List" Band (Matching Reference Image 3) */}
       <Reveal as="section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-cefi-earth rounded-3xl p-8 sm:p-12 text-white relative overflow-hidden shadow-2xl border border-cefi-gold/20">
+        <div className="bg-cefi-earth rounded-3xl p-8 sm:p-10 text-white relative overflow-hidden shadow-2xl border border-cefi-gold/20">
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">
 

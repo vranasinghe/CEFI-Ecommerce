@@ -43,8 +43,8 @@ export default function Header({ onOpenQuoteModal }) {
   return (
     <>
       {/* Top Banner (Export & Quality notice) */}
-      <div className="bg-cefi-green-dark text-emerald-100 text-xs py-1.5 px-4 text-center border-b border-emerald-900 flex items-center justify-center space-x-2">
-        <Sparkles className="w-3.5 h-3.5 text-cefi-gold animate-pulse" />
+      <div className="bg-cefi-green-dark text-emerald-100 text-xs py-1 px-4 text-center border-b border-emerald-900 flex items-center justify-center space-x-2">
+        <Sparkles className="w-3 h-3 text-cefi-gold animate-pulse" />
         <span>Rooted in Ceylon, Grown for the World — Premium Wholesale & Retail Export Dispatch</span>
         <button 
           onClick={onOpenQuoteModal} 
@@ -57,8 +57,8 @@ export default function Header({ onOpenQuoteModal }) {
       {/* Main Sticky Header */}
       <header className={`sticky top-0 z-40 transition-all duration-300 ${
         isScrolled 
-          ? 'bg-white/95 backdrop-blur-md shadow-md py-3 border-b border-gray-100' 
-          : 'bg-cefi-cream/90 backdrop-blur-sm py-4 border-b border-cefi-cream-dark'
+          ? 'bg-white/95 backdrop-blur-md shadow-md py-1 border-b border-gray-100' 
+          : 'bg-cefi-cream/90 backdrop-blur-sm py-2 border-b border-cefi-cream-dark'
       }`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           
@@ -79,7 +79,7 @@ export default function Header({ onOpenQuoteModal }) {
           <nav className="hidden md:flex items-center space-x-8 text-sm font-medium text-cefi-earth">
             <NavLink 
               to="/" 
-              className={({ isActive }) => isActive ? 'text-cefi-green font-bold border-b-2 border-cefi-gold pb-0.5' : 'hover:text-cefi-green transition-colors'}
+              className={({ isActive }) => isActive ? 'text-cefi-green font-bold' : 'hover:text-cefi-green transition-colors'}
             >
               Home
             </NavLink>
