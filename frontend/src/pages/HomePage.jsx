@@ -131,12 +131,12 @@ export default function HomePage({ onOpenQuoteModal }) {
             {/* Right Column: Hero Graphic Composition */}
             <div className="lg:col-span-5 relative flex items-center justify-center h-[400px] sm:h-[500px]">
               
-              {/* Main Bowl Feature Image */}
-              <div className="relative w-96 h-96 sm:w-[450px] sm:h-[450px] z-10 animate-pulse-soft flex justify-center items-center">
+              {/* Main Hero Feature Image */}
+              <div className="relative w-full h-full z-10 flex justify-center items-center">
                 <img
-                  src="/images/hero-mortar.png"
+                  src="/images/hero-image.png"
                   alt="Ceylon Spices & Natural Products"
-                  className="w-full h-full object-contain drop-shadow-2xl scale-125 hover:scale-150 transition-transform duration-700"
+                  className="w-full h-full object-contain drop-shadow-2xl hover:scale-105 transition-transform duration-700"
                 />
               </div>
 
