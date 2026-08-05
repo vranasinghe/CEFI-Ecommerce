@@ -48,7 +48,7 @@ export default function App() {
       <CartProvider>
         <BrowserRouter>
           <ScrollToTop />
-          <div className="min-h-screen flex flex-col justify-between bg-cefi-cream text-cefi-earth">
+          <div className="min-h-screen flex flex-col justify-between bg-cefi-cream text-cefi-earth w-full overflow-x-hidden">
             
             {/* Header / Navigation Bar */}
             <Header onOpenQuoteModal={handleOpenQuoteModal} />
