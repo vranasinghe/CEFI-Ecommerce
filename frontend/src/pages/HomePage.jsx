@@ -258,15 +258,24 @@ export default function HomePage({ onOpenQuoteModal }) {
           <div className="overflow-hidden px-2">
             <div
               key={categoryScrollIndex}
-              className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 ${
+              className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 ${
                 carouselDirection === 'right' ? 'animate-enter-from-right' : 'animate-enter-from-left'
               }`}
             >
               {[0, 1, 2, 3].map((offset) => {
                 if (categories.length === 0) return null;
                 const cat = categories[(categoryScrollIndex + offset) % categories.length];
-                // Use offset in key to prevent React from unmounting/remounting same items in different positions
-                return <CategoryCard key={`${cat.id || cat.slug}-${offset}`} category={cat} />;
+                
+                let visibilityClass = 'block';
+                if (offset === 1) visibilityClass = 'hidden sm:block';
+                if (offset === 2) visibilityClass = 'hidden md:block';
+                if (offset === 3) visibilityClass = 'hidden lg:block';
+
+                return (
+                  <div key={`${cat.id || cat.slug}-${offset}`} className={visibilityClass}>
+                    <CategoryCard category={cat} />
+                  </div>
+                );
               })}
             </div>
           </div>
