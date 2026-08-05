@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 export default function Header({ onOpenQuoteModal }) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileCategoriesOpen, setMobileCategoriesOpen] = useState(false);
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -250,20 +251,30 @@ export default function Header({ onOpenQuoteModal }) {
               Home
             </NavLink>
             
-            <div className="py-2 border-b border-gray-100">
-              <span className="block text-xs font-bold uppercase text-cefi-gold mb-2">Categories</span>
-              <div className="grid grid-cols-2 gap-2 pl-2">
-                {categories.map(cat => (
-                  <Link
-                    key={cat.slug}
-                    to={`/products/${cat.slug}`}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="text-sm py-1 text-cefi-earth hover:text-cefi-green"
-                  >
-                    • {cat.name}
-                  </Link>
-                ))}
-              </div>
+            <div className="border-b border-gray-100 py-1">
+              <button
+                type="button"
+                onClick={() => setMobileCategoriesOpen(!mobileCategoriesOpen)}
+                className="flex items-center justify-between w-full py-2 text-base font-semibold text-cefi-earth hover:text-cefi-green transition-colors"
+              >
+                <span>Categories</span>
+                <ChevronDown className={`w-4 h-4 text-cefi-gold transition-transform duration-200 ${mobileCategoriesOpen ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {mobileCategoriesOpen && (
+                <div className="grid grid-cols-2 gap-2 pl-2 pb-3 pt-1 animate-fade-in">
+                  {categories.map(cat => (
+                    <Link
+                      key={cat.slug}
+                      to={`/products/${cat.slug}`}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="text-sm py-1 text-cefi-earth/80 hover:text-cefi-green"
+                    >
+                      • {cat.name}
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
 
             <NavLink to="/products" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-base font-semibold border-b border-gray-100">
