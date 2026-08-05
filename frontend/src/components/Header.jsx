@@ -63,14 +63,14 @@ export default function Header({ onOpenQuoteModal }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           
           {/* Brand Logo */}
-          <Link to="/" className="flex items-center space-x-3 group">
+          <Link to="/" className="flex items-center space-x-1.5 sm:space-x-3 group">
             {/* Logo Mark */}
-            <div className="relative w-16 h-16 transform group-hover:scale-110 transition-transform duration-300 drop-shadow-xl">
+            <div className="relative w-12 h-12 sm:w-16 sm:h-16 shrink-0 transform group-hover:scale-110 transition-transform duration-300 drop-shadow-xl">
               <img src="/logo.png" alt="CEFI Logo" className="w-full h-full object-contain" style={{ filter: 'drop-shadow(0 2px 8px rgba(31,83,46,0.35))' }} />
             </div>
             
             {/* Wordmark Image */}
-            <div className="relative h-12 w-56 sm:w-64 transform group-hover:scale-[1.03] transition-transform duration-300">
+            <div className="relative h-9 w-40 sm:h-12 sm:w-64 shrink-0 transform group-hover:scale-[1.03] transition-transform duration-300">
               <img src="/logo-text.png" alt="CEFI Wordmark" className="w-full h-full object-contain object-left" style={{ filter: 'drop-shadow(0 1px 4px rgba(31,83,46,0.2))' }} />
             </div>
           </Link>
