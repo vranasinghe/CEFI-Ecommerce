@@ -149,13 +149,13 @@ export default function Header({ onOpenQuoteModal }) {
           </nav>
 
           {/* Right Icons */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-3">
             
             {/* Search Trigger */}
             <button 
               onClick={() => setSearchOpen(!searchOpen)}
               aria-label="Search Products"
-              className="p-2 text-cefi-earth hover:text-cefi-green hover:bg-cefi-cream rounded-full transition-colors"
+              className="hidden md:block p-2 text-cefi-earth hover:text-cefi-green hover:bg-cefi-cream rounded-md border border-gray-200 transition-colors"
             >
               <Search className="w-5 h-5" />
             </button>
@@ -164,7 +164,7 @@ export default function Header({ onOpenQuoteModal }) {
             <Link 
               to="/account" 
               aria-label="User Account"
-              className="p-2 text-cefi-earth hover:text-cefi-green hover:bg-cefi-cream rounded-full transition-colors relative"
+              className="hidden md:flex p-2 text-cefi-earth hover:text-cefi-green hover:bg-cefi-cream rounded-md border border-gray-200 transition-colors relative items-center justify-center"
             >
               <User className="w-5 h-5" />
               {user && (
@@ -176,11 +176,11 @@ export default function Header({ onOpenQuoteModal }) {
             <button 
               onClick={() => setIsCartOpen(true)}
               aria-label="Shopping Cart"
-              className="p-2 text-cefi-earth hover:text-cefi-green hover:bg-cefi-cream rounded-full transition-colors relative"
+              className="p-2 text-cefi-earth hover:text-cefi-green hover:bg-cefi-cream rounded-md border border-gray-200 transition-colors relative"
             >
               <ShoppingBag className="w-5 h-5 text-cefi-green" />
               {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-cefi-gold text-cefi-earth font-bold text-[11px] w-5 h-5 rounded-full flex items-center justify-center shadow-sm">
+                <span className="absolute -top-1.5 -right-1.5 bg-cefi-gold text-cefi-earth font-bold text-[11px] w-5 h-5 rounded-full flex items-center justify-center shadow-sm">
                   {cartCount}
                 </span>
               )}
@@ -198,7 +198,7 @@ export default function Header({ onOpenQuoteModal }) {
             {/* Mobile Hamburger Toggle */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 text-cefi-earth hover:text-cefi-green"
+              className="md:hidden p-2 text-cefi-earth hover:text-cefi-green hover:bg-cefi-cream rounded-md border border-gray-200 transition-colors"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -232,6 +232,20 @@ export default function Header({ onOpenQuoteModal }) {
         {/* Mobile Navigation Drawer */}
         {mobileMenuOpen && (
           <div className="md:hidden bg-white border-b border-gray-200 px-4 pt-3 pb-6 space-y-3 animate-fade-in">
+            {/* Mobile Search Bar */}
+            <div className="py-2 mb-2">
+              <form onSubmit={handleSearchSubmit} className="flex items-center space-x-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
+                <Search className="w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search products..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full text-sm bg-transparent border-none focus:outline-none focus:ring-0 text-cefi-earth placeholder-gray-400 py-1"
+                />
+              </form>
+            </div>
+
             <NavLink to="/" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-base font-semibold border-b border-gray-100">
               Home
             </NavLink>
