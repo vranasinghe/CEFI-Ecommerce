@@ -1,30 +1,79 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
   <defs>
-    <linearGradient id="cefiGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1F532E" />
-      <stop offset="100%" stop-color="#0e3419" />
+    <linearGradient id="leafGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2d6a2d;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a4d1a;stop-opacity:1" />
     </linearGradient>
-    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FCD34D" />
-      <stop offset="100%" stop-color="#D4AF37" />
+    <linearGradient id="trunkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B5E3C;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#5C3D1E;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="waveGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#3a7d3a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a4d1a;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="arcGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a4d1a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0d3b0d;stop-opacity:1" />
     </linearGradient>
   </defs>
 
-  <!-- Background Circle -->
-  <circle cx="32" cy="32" r="30" fill="url(#cefiGrad)" stroke="#D4AF37" stroke-width="2.5" />
+  <!-- Outer crescent arc (left + bottom sweep) -->
+  <path d="M 50 5
+             A 45 45 0 1 0 95 55
+             A 45 45 0 0 1 50 5 Z"
+        fill="url(#arcGrad)" />
 
-  <!-- Coconut / Ceylon Palm Trunk -->
-  <path d="M26 48 C28 38, 33 32, 36 22" stroke="#D4AF37" stroke-width="3" stroke-linecap="round" fill="none" />
-  
-  <!-- Palm Fronds / Organic Leaves -->
-  <path d="M36 22 C32 14, 20 16, 14 20 C20 22, 28 23, 36 22 Z" fill="url(#goldGrad)" />
-  <path d="M36 22 C42 13, 50 15, 54 21 C47 22, 41 23, 36 22 Z" fill="url(#goldGrad)" />
-  <path d="M36 22 C36 12, 31 8, 25 9 C28 14, 32 18, 36 22 Z" fill="#10b981" />
-  <path d="M36 22 C38 11, 45 9, 49 11 C46 15, 41 19, 36 22 Z" fill="#10b981" />
-  <path d="M36 22 C30 26, 22 28, 16 33 C23 32, 30 29, 36 22 Z" fill="#D4AF37" opacity="0.9" />
-  <path d="M36 22 C42 26, 48 29, 52 34 C46 32, 40 28, 36 22 Z" fill="#D4AF37" opacity="0.9" />
+  <!-- White inner circle to create crescent effect -->
+  <circle cx="52" cy="45" r="36" fill="white" />
 
-  <!-- Sun / Ocean Curve at Base -->
-  <path d="M18 47 C24 44, 38 44, 46 47" stroke="#FCD34D" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.85" />
-  <path d="M22 51 C28 49, 36 49, 42 51" stroke="#10b981" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.8" />
+  <!-- Ground / hill waves -->
+  <!-- Back dark wave -->
+  <path d="M 18 68 Q 35 58 52 65 Q 68 72 82 62 L 82 78 Q 68 88 52 81 Q 35 74 18 84 Z"
+        fill="url(#arcGrad)" />
+  <!-- Front lighter wave -->
+  <path d="M 15 75 Q 33 65 52 72 Q 70 79 84 69 L 84 80 Q 70 90 52 83 Q 33 76 15 86 Z"
+        fill="url(#waveGrad)" opacity="0.85"/>
+  <!-- Lightest front wave -->
+  <path d="M 16 80 Q 34 71 52 77 Q 70 84 83 74 L 83 81 Q 70 91 52 85 Q 34 79 16 88 Z"
+        fill="#4a9a4a" opacity="0.6"/>
+
+  <!-- White wave gap lines -->
+  <path d="M 18 72 Q 35 63 52 69 Q 68 75 82 65" stroke="white" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+  <path d="M 16 78 Q 34 69 52 75 Q 70 81 83 71" stroke="white" stroke-width="1" fill="none" stroke-linecap="round"/>
+
+  <!-- Palm trunk -->
+  <path d="M 46 65 Q 44 52 43 42 Q 42 35 45 28"
+        stroke="url(#trunkGrad)" stroke-width="5" fill="none" stroke-linecap="round"/>
+
+  <!-- Palm fronds - radiating from top of trunk -->
+  <!-- Frond 1 - top right -->
+  <path d="M 45 28 Q 55 20 68 18 Q 60 24 55 30"
+        fill="url(#leafGrad)" />
+  <!-- Frond 2 - right -->
+  <path d="M 45 28 Q 58 26 70 28 Q 62 30 55 34"
+        fill="url(#leafGrad)" />
+  <!-- Frond 3 - top left -->
+  <path d="M 45 28 Q 38 18 28 14 Q 34 22 40 28"
+        fill="url(#leafGrad)" />
+  <!-- Frond 4 - left -->
+  <path d="M 45 28 Q 36 24 26 24 Q 33 28 40 32"
+        fill="url(#leafGrad)" />
+  <!-- Frond 5 - top center right -->
+  <path d="M 45 28 Q 50 16 58 10 Q 54 18 50 26"
+        fill="url(#leafGrad)" />
+  <!-- Frond 6 - top center left -->
+  <path d="M 45 28 Q 40 15 34 10 Q 38 18 42 26"
+        fill="url(#leafGrad)" />
+  <!-- Frond 7 - far right drooping -->
+  <path d="M 45 28 Q 60 30 72 36 Q 63 33 56 32"
+        fill="#2d6a2d" opacity="0.8"/>
+
+  <!-- Frond detail lines for texture -->
+  <path d="M 45 28 Q 55 20 68 18" stroke="#1a4d1a" stroke-width="0.5" fill="none"/>
+  <path d="M 45 28 Q 38 18 28 14" stroke="#1a4d1a" stroke-width="0.5" fill="none"/>
+  <path d="M 45 28 Q 50 16 58 10" stroke="#1a4d1a" stroke-width="0.5" fill="none"/>
+  <path d="M 45 28 Q 40 15 34 10" stroke="#1a4d1a" stroke-width="0.5" fill="none"/>
+  <path d="M 45 28 Q 58 26 70 28" stroke="#1a4d1a" stroke-width="0.5" fill="none"/>
+  <path d="M 45 28 Q 36 24 26 24" stroke="#1a4d1a" stroke-width="0.5" fill="none"/>
 </svg>
