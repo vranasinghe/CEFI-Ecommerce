@@ -376,13 +376,23 @@ app.get('/api/orders', (req, res) => {
 });
 
 app.post('/api/orders', async (req, res) => {
-  const { customer, items, total, paymentMethod } = req.body;
+  const { customer, items, total, paymentMethod, targetEmail } = req.body;
   if (!customer || !items || !total) return res.status(400).json({ success: false, message: 'Invalid order data.' });
   const orderId = `CEFI-ORD-${Math.floor(100000 + Math.random() * 900000)}`;
-  const orderRecord = { orderId, customer, items, total, paymentMethod: paymentMethod || 'Card / PayHere', status: 'Confirmed', createdAt: new Date().toISOString() };
+  const destinationEmail = targetEmail || 'ceylonecofreshinfinity@gmail.com';
+  const orderRecord = {
+    orderId,
+    customer,
+    items,
+    total,
+    paymentMethod: paymentMethod || 'Direct Email Order',
+    targetEmail: destinationEmail,
+    status: 'Confirmed',
+    createdAt: new Date().toISOString()
+  };
   localOrders.unshift(orderRecord);
-  console.log('🛒 New Order:', orderId, 'Total:', total);
-  return res.json({ success: true, orderId, message: 'Order placed successfully!' });
+  console.log(`🛒 New Order Dispatched to [${destinationEmail}]:`, orderId, 'Total:', `$${total}`);
+  return res.json({ success: true, orderId, targetEmail: destinationEmail, message: 'Order placed & emailed successfully!' });
 });
 
 // ── Start Server ──────────────────────────────────────────────────────────────
