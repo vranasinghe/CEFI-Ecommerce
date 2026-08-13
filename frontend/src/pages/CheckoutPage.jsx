@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ShieldCheck, CheckCircle2, CreditCard, Landmark, Truck, ArrowRight, Lock } from 'lucide-react';
+import { ShieldCheck, CheckCircle2, Mail, Send, Truck, ArrowRight } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import LoginPromptModal from '../components/LoginPromptModal';
@@ -19,7 +19,7 @@ export default function CheckoutPage() {
     city: 'Colombo',
     postalCode: '00500',
     country: 'Sri Lanka',
-    paymentMethod: 'PayHere Gateway'
+    paymentMethod: 'Direct Email Order'
   });
 
   const [loading, setLoading] = useState(false);
@@ -86,7 +86,7 @@ export default function CheckoutPage() {
         </div>
 
         <div className="space-y-2">
-          <span className="text-xs uppercase font-bold tracking-widest text-cefi-gold">Order Confirmed</span>
+          <span className="text-xs uppercase font-bold tracking-widest text-cefi-gold">Email Order Request Sent</span>
           <h1 className="font-serif font-bold text-3xl text-cefi-earth">Thank You For Your Order!</h1>
           <p className="text-xs text-gray-500 font-sans">
             Order Reference: <strong className="text-cefi-green font-mono">{orderConfirmed}</strong>
@@ -94,7 +94,7 @@ export default function CheckoutPage() {
         </div>
 
         <p className="text-xs text-gray-600 max-w-md mx-auto leading-relaxed">
-          We have received your order details for Ceylon Eco Fresh Infinity produce. An order confirmation receipt has been dispatched to <strong>{formData.email}</strong>.
+          We have received your order details for Ceylon Eco Fresh Infinity produce. An order confirmation receipt and proforma invoice have been emailed to <strong>{formData.email}</strong>. Our team will contact you directly to process your dispatch.
         </p>
 
         <div className="pt-4 flex justify-center space-x-4">
@@ -147,8 +147,10 @@ export default function CheckoutPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
       
       <div className="border-b border-gray-200 pb-4">
-        <h1 className="font-serif font-bold text-3xl text-cefi-earth">Checkout & Shipping</h1>
-        <p className="text-xs text-gray-500 mt-1">Complete your delivery address and payment verification.</p>
+        <h1 className="font-serif font-bold text-3xl text-cefi-earth">Checkout & Order Placement</h1>
+        <p className="text-xs text-gray-500 mt-1">
+          Complete your contact & shipping details. Your order request will be emailed directly to our team for processing.
+        </p>
       </div>
 
       <form onSubmit={handleSubmitOrder} className="grid grid-cols-1 lg:grid-cols-12 gap-10">
@@ -158,7 +160,7 @@ export default function CheckoutPage() {
           
           <div className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-100 shadow-soft space-y-4">
             <h3 className="font-serif font-bold text-xl text-cefi-earth border-b border-gray-100 pb-3">
-              1. Customer Shipping Details
+              Customer Shipping Details
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -249,51 +251,16 @@ export default function CheckoutPage() {
 
           </div>
 
-          {/* Payment Method Options */}
-          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-100 shadow-soft space-y-4">
-            <h3 className="font-serif font-bold text-xl text-cefi-earth border-b border-gray-100 pb-3">
-              2. Payment Method Gateway
-            </h3>
-
-            <div className="space-y-3">
-              
-              <label className={`flex items-center space-x-3 p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                formData.paymentMethod === 'PayHere Gateway' ? 'border-cefi-green bg-emerald-50/50' : 'border-gray-100'
-              }`}>
-                <input
-                  type="radio"
-                  name="paymentMethod"
-                  value="PayHere Gateway"
-                  checked={formData.paymentMethod === 'PayHere Gateway'}
-                  onChange={e => setFormData({ ...formData, paymentMethod: e.target.value })}
-                  className="text-cefi-green focus:ring-cefi-green"
-                />
-                <div className="flex-1 flex items-center justify-between">
-                  <div>
-                    <strong className="block text-sm text-cefi-earth">PayHere Gateway (Visa / Mastercard / LKR)</strong>
-                    <span className="text-xs text-gray-500">Sri Lankan card & internet banking payment gateway.</span>
-                  </div>
-                  <span className="px-2.5 py-1 bg-cefi-gold text-cefi-earth text-[10px] font-bold rounded">PayHere</span>
-                </div>
-              </label>
-
-              <label className={`flex items-center space-x-3 p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                formData.paymentMethod === 'Direct Bank Wire / L/C' ? 'border-cefi-green bg-emerald-50/50' : 'border-gray-100'
-              }`}>
-                <input
-                  type="radio"
-                  name="paymentMethod"
-                  value="Direct Bank Wire / L/C"
-                  checked={formData.paymentMethod === 'Direct Bank Wire / L/C'}
-                  onChange={e => setFormData({ ...formData, paymentMethod: e.target.value })}
-                  className="text-cefi-green focus:ring-cefi-green"
-                />
-                <div>
-                  <strong className="block text-sm text-cefi-earth">Direct Bank Wire / Invoice Transfer</strong>
-                  <span className="text-xs text-gray-500">Bank account payment instructions will be emailed.</span>
-                </div>
-              </label>
-
+          {/* Email Order Info Banner */}
+          <div className="bg-emerald-50/70 p-6 rounded-3xl border border-emerald-100 flex items-start space-x-4">
+            <div className="w-10 h-10 bg-cefi-green text-white rounded-2xl flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+              <Mail className="w-5 h-5 text-cefi-gold" />
+            </div>
+            <div className="space-y-1 text-xs text-cefi-earth">
+              <strong className="block text-sm font-serif font-bold text-cefi-green">Direct Email Order Confirmation</strong>
+              <p className="text-gray-600 leading-relaxed">
+                When you click <strong>Send Email to Place Order</strong>, your order details and items list will be automatically dispatched to our export processing team. You will receive an instant email copy with contact information to finalize payment and shipping.
+              </p>
             </div>
           </div>
 
@@ -347,17 +314,17 @@ export default function CheckoutPage() {
               className="w-full py-4 bg-cefi-green hover:bg-cefi-green-dark text-white rounded-full font-serif font-bold text-sm shadow-md flex items-center justify-center space-x-2 transition-all disabled:opacity-50"
             >
               {loading ? (
-                <span>Processing Payment...</span>
+                <span>Sending Email Order...</span>
               ) : (
                 <>
-                  <Lock className="w-4 h-4 text-cefi-gold" />
-                  <span>Place Order & Pay (${grandTotal.toFixed(2)})</span>
+                  <Send className="w-4 h-4 text-cefi-gold" />
+                  <span>Send Email to Place Order</span>
                 </>
               )}
             </button>
 
             <div className="text-center pt-1">
-              <span className="text-[11px] text-gray-400">By placing this order you agree to CEFI Export terms & conditions.</span>
+              <span className="text-[11px] text-gray-400">An email notification with your order details will be dispatched immediately.</span>
             </div>
           </div>
 
