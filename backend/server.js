@@ -38,7 +38,31 @@ if (multer) {
 const localContactMessages = [];
 const localSubscribers = [];
 const localQuotes = [];
-const localOrders = [];
+const localOrders = [
+  {
+    orderId: 'CEFI-ORD-849201',
+    customer: { name: 'Jane Smith', email: 'jane.smith@example.com', phone: '+94 77 123 4567', country: 'Sri Lanka', address: '42 Galle Road', city: 'Colombo', postalCode: '00300' },
+    items: [
+      { id: 'prod-001', name: 'Single Origin Ceylon Black Tea (250g)', price: 18.50, quantity: 1, image: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=600&q=80' },
+      { id: 'prod-003', name: 'Alba Grade Cinnamon Quills (150g)', price: 14.90, quantity: 1, image: 'https://images.unsplash.com/photo-1509358271058-acd05cc9326e?auto=format&fit=crop&w=600&q=80' }
+    ],
+    total: 33.40,
+    paymentMethod: 'Direct Email Order',
+    status: 'Dispatched',
+    createdAt: new Date(Date.now() - 86400000 * 2).toISOString()
+  },
+  {
+    orderId: 'CEFI-ORD-912044',
+    customer: { name: 'David Miller', email: 'dmiller@exporttrade.com', phone: '+1 415 890 1234', country: 'United States', address: '742 Evergreen Terrace', city: 'San Francisco', postalCode: '94107' },
+    items: [
+      { id: 'prod-002', name: 'Organic Moringa Powder (200g)', price: 16.00, quantity: 2, image: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=600&q=80' }
+    ],
+    total: 47.00,
+    paymentMethod: 'Direct Email Order',
+    status: 'Processing',
+    createdAt: new Date(Date.now() - 86400000 * 1).toISOString()
+  }
+];
 
 // ── Health Check ─────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
@@ -371,12 +395,16 @@ app.post('/api/quotes', async (req, res) => {
   return res.json({ success: true, message: 'Quote request received!' });
 });
 
+app.get('/api/orders', (req, res) => {
+  return res.json(localOrders);
+});
+
 app.post('/api/orders', async (req, res) => {
   const { customer, items, total, paymentMethod } = req.body;
   if (!customer || !items || !total) return res.status(400).json({ success: false, message: 'Invalid order data.' });
   const orderId = `CEFI-ORD-${Math.floor(100000 + Math.random() * 900000)}`;
   const orderRecord = { orderId, customer, items, total, paymentMethod: paymentMethod || 'Card / PayHere', status: 'Confirmed', createdAt: new Date().toISOString() };
-  localOrders.push(orderRecord);
+  localOrders.unshift(orderRecord);
   console.log('🛒 New Order:', orderId, 'Total:', total);
   return res.json({ success: true, orderId, message: 'Order placed successfully!' });
 });

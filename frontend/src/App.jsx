@@ -7,7 +7,7 @@ import QuoteModal from './components/QuoteModal';
 
 // Context Providers
 import { CartProvider } from './context/CartContext';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { trackPageView } from './utils/analytics';
 
 // Pages
@@ -35,6 +35,58 @@ function ScrollToTop() {
   return null;
 }
 
+function MainLayout({ onOpenQuoteModal, quoteModalOpen, setQuoteModalOpen, selectedQuoteProduct }) {
+  const { pathname } = useLocation();
+  const { user } = useAuth();
+
+  // Hide customer Header/Footer on Admin routes
+  const isAdminRoute = pathname.startsWith('/admin');
+
+  return (
+    <div className="min-h-screen flex flex-col justify-between bg-cefi-cream text-cefi-earth w-full overflow-x-hidden">
+      {/* Show Customer Header only on non-admin routes */}
+      {!isAdminRoute && <Header onOpenQuoteModal={onOpenQuoteModal} />}
+
+      {/* Main Page Routes */}
+      <main className="flex-1">
+        <Routes>
+          <Route path="/" element={<HomePage onOpenQuoteModal={onOpenQuoteModal} />} />
+          <Route path="/products" element={<ProductsPage onOpenQuoteModal={onOpenQuoteModal} />} />
+          <Route path="/products/:category" element={<ProductsPage onOpenQuoteModal={onOpenQuoteModal} />} />
+          <Route path="/products/:category/:slug" element={<ProductDetailPage onOpenQuoteModal={handleOpenQuoteModal} />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/blog" element={<BlogPage />} />
+          <Route path="/blog/:slug" element={<BlogPostPage />} />
+          <Route path="/cart" element={<CartPage />} />
+          <Route path="/checkout" element={<CheckoutPage />} />
+          <Route path="/account" element={<AccountPage />} />
+          
+          {/* OAuth Callback */}
+          <Route path="/auth/callback" element={<AuthCallbackPage />} />
+
+          {/* Admin Routes - full screen Admin Portal */}
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/products/new" element={<AdminProductForm mode="add" />} />
+          <Route path="/admin/products/edit/:id" element={<AdminProductForm mode="edit" />} />
+        </Routes>
+      </main>
+
+      {/* Show Customer Footer only on non-admin routes */}
+      {!isAdminRoute && <Footer />}
+
+      {/* Slide-over Cart Drawer & Quote Modal */}
+      {!isAdminRoute && <CartDrawer />}
+
+      <QuoteModal
+        isOpen={quoteModalOpen}
+        onClose={() => setQuoteModalOpen(false)}
+        initialProduct={selectedQuoteProduct}
+      />
+    </div>
+  );
+}
+
 export default function App() {
   const [quoteModalOpen, setQuoteModalOpen] = useState(false);
   const [selectedQuoteProduct, setSelectedQuoteProduct] = useState('');
@@ -49,50 +101,12 @@ export default function App() {
       <CartProvider>
         <BrowserRouter>
           <ScrollToTop />
-          <div className="min-h-screen flex flex-col justify-between bg-cefi-cream text-cefi-earth w-full overflow-x-hidden">
-            
-            {/* Header / Navigation Bar */}
-            <Header onOpenQuoteModal={handleOpenQuoteModal} />
-
-            {/* Main Page Routes */}
-            <main className="flex-1">
-              <Routes>
-                <Route path="/" element={<HomePage onOpenQuoteModal={handleOpenQuoteModal} />} />
-                <Route path="/products" element={<ProductsPage onOpenQuoteModal={handleOpenQuoteModal} />} />
-                <Route path="/products/:category" element={<ProductsPage onOpenQuoteModal={handleOpenQuoteModal} />} />
-                <Route path="/products/:category/:slug" element={<ProductDetailPage onOpenQuoteModal={handleOpenQuoteModal} />} />
-                <Route path="/about" element={<AboutPage />} />
-                <Route path="/contact" element={<ContactPage />} />
-                <Route path="/blog" element={<BlogPage />} />
-                <Route path="/blog/:slug" element={<BlogPostPage />} />
-                <Route path="/cart" element={<CartPage />} />
-                <Route path="/checkout" element={<CheckoutPage />} />
-                <Route path="/account" element={<AccountPage />} />
-                
-                {/* OAuth Callback — Supabase redirects here after Google/Facebook login */}
-                <Route path="/auth/callback" element={<AuthCallbackPage />} />
-
-                {/* Admin Routes - full screen, no header/footer */}
-                <Route path="/admin" element={<AdminDashboard />} />
-                <Route path="/admin/products/new" element={<AdminProductForm mode="add" />} />
-                <Route path="/admin/products/edit/:id" element={<AdminProductForm mode="edit" />} />
-              </Routes>
-            </main>
-
-            {/* Footer */}
-            <Footer />
-
-            {/* Slide-over Cart Drawer */}
-            <CartDrawer />
-
-            {/* Wholesale / Export Quote Modal */}
-            <QuoteModal
-              isOpen={quoteModalOpen}
-              onClose={() => setQuoteModalOpen(false)}
-              initialProduct={selectedQuoteProduct}
-            />
-
-          </div>
+          <MainLayout
+            onOpenQuoteModal={handleOpenQuoteModal}
+            quoteModalOpen={quoteModalOpen}
+            setQuoteModalOpen={setQuoteModalOpen}
+            selectedQuoteProduct={selectedQuoteProduct}
+          />
         </BrowserRouter>
       </CartProvider>
     </AuthProvider>
