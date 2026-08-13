@@ -15,14 +15,6 @@ const CATEGORY_ICONS = {
   vegetables: '🥦',
 };
 
-// Sample/Mock User Accounts for demonstration & display
-const INITIAL_USERS = [
-  { id: 'usr-admin-01', name: 'Rodney (Admin)', email: 'rodney1st@gmail.com', provider: 'Email & Password', role: 'admin', status: 'Active', joinedAt: 'August 13, 2026' },
-  { id: 'usr-102', name: 'Jane Smith', email: 'jane.smith@example.com', provider: 'Google Auth', role: 'customer', status: 'Active', joinedAt: 'August 10, 2026' },
-  { id: 'usr-103', name: 'David Miller', email: 'dmiller@exporttrade.com', provider: 'Facebook Auth', role: 'customer', status: 'Active', joinedAt: 'August 11, 2026' },
-  { id: 'usr-104', name: 'Samantha Perera', email: 'samantha.p@ceylontea.lk', provider: 'Google Auth', role: 'customer', status: 'Active', joinedAt: 'August 12, 2026' },
-];
-
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const { user: currentUser, logout } = useAuth();
@@ -34,7 +26,14 @@ export default function AdminDashboard() {
   const [products, setProducts]             = useState([]);
   const [categories, setCategories]         = useState([]);
   const [orders, setOrders]                 = useState([]);
-  const [usersList, setUsersList]           = useState(INITIAL_USERS);
+  const [usersList, setUsersList]           = useState(() => {
+    try {
+      const savedUser = localStorage.getItem('cefi_user');
+      return savedUser ? [JSON.parse(savedUser)] : [];
+    } catch {
+      return [];
+    }
+  });
   const [loading, setLoading]               = useState(true);
 
   // Products Tab Filters
@@ -364,52 +363,58 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs text-left">
-                  <thead>
-                    <tr className="bg-gray-50 text-gray-400 uppercase font-bold text-[10px]">
-                      <th className="px-6 py-3">User Name</th>
-                      <th className="px-4 py-3">Email Address</th>
-                      <th className="px-4 py-3">Auth Provider</th>
-                      <th className="px-4 py-3">Role</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Joined Date</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filteredUsers.map(u => (
-                      <tr key={u.id} className="hover:bg-gray-50/60 transition-colors">
-                        <td className="px-6 py-4 font-bold text-cefi-earth flex items-center space-x-2">
-                          <div className="w-7 h-7 bg-cefi-green/10 text-cefi-green rounded-full flex items-center justify-center font-bold text-xs">
-                            {u.name.charAt(0).toUpperCase()}
-                          </div>
-                          <span>{u.name}</span>
-                        </td>
-                        <td className="px-4 py-4 text-gray-600 font-mono">{u.email}</td>
-                        <td className="px-4 py-4">
-                          <span className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full font-semibold text-[10px]">
-                            {u.provider}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4">
-                          <span className={`px-2.5 py-1 rounded-full font-bold text-[10px] uppercase ${
-                            u.role === 'admin' ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-blue-50 text-blue-700'
-                          }`}>
-                            {u.role}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4">
-                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-bold text-[10px] inline-flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
-                            {u.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 text-gray-400">{u.joinedAt}</td>
+              {filteredUsers.length === 0 ? (
+                <div className="py-16 text-center text-xs text-gray-400">
+                  No user accounts registered yet. Registered customer logins will appear here automatically.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead>
+                      <tr className="bg-gray-50 text-gray-400 uppercase font-bold text-[10px]">
+                        <th className="px-6 py-3">User Name</th>
+                        <th className="px-4 py-3">Email Address</th>
+                        <th className="px-4 py-3">Auth Provider</th>
+                        <th className="px-4 py-3">Role</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3">Joined Date</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredUsers.map(u => (
+                        <tr key={u.id} className="hover:bg-gray-50/60 transition-colors">
+                          <td className="px-6 py-4 font-bold text-cefi-earth flex items-center space-x-2">
+                            <div className="w-7 h-7 bg-cefi-green/10 text-cefi-green rounded-full flex items-center justify-center font-bold text-xs">
+                              {u.name.charAt(0).toUpperCase()}
+                            </div>
+                            <span>{u.name}</span>
+                          </td>
+                          <td className="px-4 py-4 text-gray-600 font-mono">{u.email}</td>
+                          <td className="px-4 py-4">
+                            <span className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full font-semibold text-[10px]">
+                              {u.provider}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4">
+                            <span className={`px-2.5 py-1 rounded-full font-bold text-[10px] uppercase ${
+                              u.role === 'admin' ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-blue-50 text-blue-700'
+                            }`}>
+                              {u.role}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4">
+                            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-bold text-[10px] inline-flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                              {u.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-gray-400">{u.joinedAt}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}

@@ -168,23 +168,18 @@ export default function AccountPage() {
               <Package className="w-5 h-5 text-cefi-green" />
               <span>Your Orders & Quote History</span>
             </h3>
-            <span className="text-xs text-cefi-gold font-bold">1 Order Recorded</span>
+            <span className="text-xs text-cefi-gold font-bold">Account Activity</span>
           </div>
 
-          <div className="border border-gray-100 rounded-2xl p-5 space-y-3 bg-cefi-cream/40">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-mono font-bold text-cefi-green">CEFI-ORD-849201</span>
-              <span className="px-2.5 py-1 bg-emerald-100 text-cefi-green font-bold text-[10px] rounded-full">
-                Dispatched
-              </span>
-            </div>
-            <p className="text-xs text-gray-600">
-              Single Origin Ceylon Black Tea (250g), Alba Grade Cinnamon Quills (150g)
-            </p>
-            <div className="flex items-center justify-between pt-2 text-xs border-t border-gray-200/60">
-              <span className="text-gray-400">Date: August 1, 2026</span>
-              <span className="font-serif font-bold text-cefi-earth">$33.40</span>
-            </div>
+          <div className="text-center py-8 space-y-3 bg-cefi-cream/30 rounded-2xl border border-gray-100">
+            <Package className="w-8 h-8 text-cefi-green/40 mx-auto" />
+            <p className="text-xs text-gray-500 font-medium">Your placed orders and requested quotes will be displayed here.</p>
+            <Link
+              to="/products"
+              className="inline-block px-5 py-2 bg-cefi-green text-white text-xs font-semibold rounded-full hover:bg-cefi-green-dark transition-all"
+            >
+              Browse Catalog
+            </Link>
           </div>
         </div>
 
@@ -273,7 +268,7 @@ export default function AccountPage() {
                 <input
                   type="text"
                   required
-                  placeholder="Jane Doe"
+                  placeholder="Your Full Name"
                   value={name}
                   onChange={e => setName(e.target.value)}
                   className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-cefi-green focus:border-transparent outline-none transition"
@@ -289,7 +284,7 @@ export default function AccountPage() {
               <input
                 type="email"
                 required
-                placeholder="customer@example.com or rodney1st@gmail.com"
+                placeholder="customer@example.com"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-cefi-green focus:border-transparent outline-none transition"
