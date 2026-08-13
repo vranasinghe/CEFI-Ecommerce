@@ -455,11 +455,21 @@ async function sendOrderEmail(orderRecord) {
         },
       });
 
+      // Build recipient list — CC the customer so email has different TO and CC (prevents Gmail self-email filter)
+      const toList = [targetEmail];
+      const ccList = customer.email && customer.email !== targetEmail ? [customer.email] : [];
+
       await transporter.sendMail({
-        from: `"CEFI Store Orders" <${process.env.EMAIL_USER}>`,
-        to: targetEmail,
+        from: `"CEFI Export Orders" <${process.env.EMAIL_USER}>`,
+        to: toList.join(', '),
+        cc: ccList.join(', ') || undefined,
         replyTo: customer.email,
         subject: subject,
+        headers: {
+          'X-Priority': '1',
+          'X-MSMail-Priority': 'High',
+          'Importance': 'High',
+        },
         text: `New Order: ${orderRecord.orderId}\nCustomer: ${customer.name} (${customer.email})\nPhone: ${customer.phone}\nAddress: ${customer.address}, ${customer.city}, ${customer.country}\n\nProducts:\n${itemsText}\n\nTotal: $${orderRecord.total}`,
         html: htmlContent,
       });
