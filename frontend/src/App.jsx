@@ -53,7 +53,7 @@ function MainLayout({ onOpenQuoteModal, quoteModalOpen, setQuoteModalOpen, selec
           <Route path="/" element={<HomePage onOpenQuoteModal={onOpenQuoteModal} />} />
           <Route path="/products" element={<ProductsPage onOpenQuoteModal={onOpenQuoteModal} />} />
           <Route path="/products/:category" element={<ProductsPage onOpenQuoteModal={onOpenQuoteModal} />} />
-          <Route path="/products/:category/:slug" element={<ProductDetailPage onOpenQuoteModal={handleOpenQuoteModal} />} />
+          <Route path="/products/:category/:slug" element={<ProductDetailPage onOpenQuoteModal={onOpenQuoteModal} />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/blog" element={<BlogPage />} />
