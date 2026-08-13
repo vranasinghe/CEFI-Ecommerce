@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { Search, ShoppingBag, User, ChevronDown, Menu, X, Globe, Sparkles } from 'lucide-react';
+import { Search, ShoppingBag, User, ChevronDown, Menu, X, Globe, Sparkles, Shield } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -147,6 +147,16 @@ export default function Header({ onOpenQuoteModal }) {
             >
               Blog
             </NavLink>
+
+            {user?.role === 'admin' && (
+              <NavLink 
+                to="/admin" 
+                className="flex items-center space-x-1 px-3 py-1 bg-amber-500/10 text-amber-700 font-bold rounded-full border border-amber-500/30 hover:bg-amber-500/20 transition-all text-xs"
+              >
+                <Shield className="w-3.5 h-3.5 text-amber-600" />
+                <span>Admin Panel</span>
+              </NavLink>
+            )}
           </nav>
 
           {/* Right Icons */}

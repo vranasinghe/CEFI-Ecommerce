@@ -2,15 +2,18 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ShieldCheck, CheckCircle2, CreditCard, Landmark, Truck, ArrowRight, Lock } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import LoginPromptModal from '../components/LoginPromptModal';
 import { trackCheckoutStart } from '../utils/analytics';
 
 export default function CheckoutPage() {
   const { cart, cartTotal, clearCart } = useCart();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
+    name: user?.name || '',
+    email: user?.email || '',
     phone: '',
     address: '',
     city: 'Colombo',
@@ -24,6 +27,17 @@ export default function CheckoutPage() {
 
   const shippingCost = cartTotal > 100 || cartTotal === 0 ? 0 : 15.00;
   const grandTotal = cartTotal + shippingCost;
+
+  // Pre-fill form with user data once auth is ready
+  React.useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        name: prev.name || user.name || '',
+        email: prev.email || user.email || '',
+      }));
+    }
+  }, [user]);
 
   React.useEffect(() => {
     if (cart.length > 0) {
@@ -90,6 +104,31 @@ export default function CheckoutPage() {
           >
             Continue Browsing
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Auth Gate: show spinner while auth resolves, modal if still a guest ───
+  if (authLoading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-cefi-green border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-20 text-center space-y-4">
+        <LoginPromptModal
+          isOpen={true}
+          onClose={() => navigate('/cart')}
+          redirectTo="/checkout"
+        />
+        {/* Fallback background content */}
+        <div className="opacity-0 pointer-events-none">
+          <h2 className="font-serif font-bold text-xl">Loading...</h2>
         </div>
       </div>
     );

@@ -23,6 +23,7 @@ import CheckoutPage from './pages/CheckoutPage';
 import AccountPage from './pages/AccountPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminProductForm from './pages/AdminProductForm';
+import AuthCallbackPage from './pages/AuthCallbackPage';
 
 // Scroll To Top on route change
 function ScrollToTop() {
@@ -68,6 +69,9 @@ export default function App() {
                 <Route path="/checkout" element={<CheckoutPage />} />
                 <Route path="/account" element={<AccountPage />} />
                 
+                {/* OAuth Callback — Supabase redirects here after Google/Facebook login */}
+                <Route path="/auth/callback" element={<AuthCallbackPage />} />
+
                 {/* Admin Routes - full screen, no header/footer */}
                 <Route path="/admin" element={<AdminDashboard />} />
                 <Route path="/admin/products/new" element={<AdminProductForm mode="add" />} />

@@ -1,11 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { X, Trash2, Plus, Minus, ArrowRight, ShoppingBag } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import LoginPromptModal from './LoginPromptModal';
 
 export default function CartDrawer() {
   const { isCartOpen, setIsCartOpen, cart, updateQuantity, removeFromCart, cartTotal } = useCart();
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+
+  const handleCheckout = () => {
+    if (!user) {
+      setLoginModalOpen(true);
+    } else {
+      setIsCartOpen(false);
+      navigate('/checkout');
+    }
+  };
 
   if (!isCartOpen) return null;
 
@@ -115,10 +128,7 @@ export default function CartDrawer() {
                   View Basket
                 </button>
                 <button
-                  onClick={() => {
-                    setIsCartOpen(false);
-                    navigate('/checkout');
-                  }}
+                  onClick={handleCheckout}
                   className="py-2.5 bg-cefi-green hover:bg-cefi-green-dark text-white rounded-full text-xs font-semibold shadow-md flex items-center justify-center space-x-1 transition-all"
                 >
                   <span>Checkout</span>
@@ -127,6 +137,14 @@ export default function CartDrawer() {
               </div>
             </div>
           )}
+
+          {/* Login gate modal */}
+          <LoginPromptModal
+            isOpen={loginModalOpen}
+            onClose={() => setLoginModalOpen(false)}
+            onSuccess={() => { setIsCartOpen(false); }}
+            redirectTo="/checkout"
+          />
 
         </div>
       </div>

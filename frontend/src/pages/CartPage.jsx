@@ -1,11 +1,23 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Trash2, Plus, Minus, ArrowRight, ShoppingBag, ShieldCheck } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import LoginPromptModal from '../components/LoginPromptModal';
 
 export default function CartPage() {
   const { cart, updateQuantity, removeFromCart, cartTotal, clearCart } = useCart();
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+
+  const handleCheckout = () => {
+    if (!user) {
+      setLoginModalOpen(true);
+    } else {
+      navigate('/checkout');
+    }
+  };
 
   const shippingCost = cartTotal > 100 || cartTotal === 0 ? 0 : 15.00;
   const grandTotal = cartTotal + shippingCost;
@@ -140,12 +152,19 @@ export default function CartPage() {
           </div>
 
           <button
-            onClick={() => navigate('/checkout')}
+            onClick={handleCheckout}
             className="w-full py-4 bg-cefi-green hover:bg-cefi-green-dark text-white rounded-full font-serif font-bold text-sm shadow-md flex items-center justify-center space-x-2 transition-all"
           >
             <span>Proceed to Checkout</span>
             <ArrowRight className="w-4 h-4 text-cefi-gold" />
           </button>
+
+          {/* Login prompt shown when user is not authenticated */}
+          <LoginPromptModal
+            isOpen={loginModalOpen}
+            onClose={() => setLoginModalOpen(false)}
+            redirectTo="/checkout"
+          />
 
           <div className="pt-2 flex items-center justify-center space-x-2 text-[11px] text-gray-400">
             <ShieldCheck className="w-4 h-4 text-cefi-green" />
