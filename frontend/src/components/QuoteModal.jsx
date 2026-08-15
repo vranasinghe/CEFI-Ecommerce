@@ -99,8 +99,10 @@ export default function QuoteModal({ isOpen, onClose, initialProduct = '' }) {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold uppercase text-cefi-earth/70 mb-1">Target Product</label>
+                  <label htmlFor="quote-product-name" className="block text-xs font-semibold uppercase text-cefi-earth/70 mb-1">Target Product</label>
                   <input
+                    id="quote-product-name"
+                    name="productName"
                     type="text"
                     required
                     value={formData.productName}
@@ -110,10 +112,12 @@ export default function QuoteModal({ isOpen, onClose, initialProduct = '' }) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold uppercase text-cefi-earth/70 mb-1">Company / Organization Name *</label>
+                  <label htmlFor="quote-company-name" className="block text-xs font-semibold uppercase text-cefi-earth/70 mb-1">Company / Organization Name *</label>
                   <div className="relative">
                     <Building2 className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
                     <input
+                      id="quote-company-name"
+                      name="companyName"
                       type="text"
                       required
                       placeholder="e.g. Global Foods Trading Ltd"
@@ -125,8 +129,10 @@ export default function QuoteModal({ isOpen, onClose, initialProduct = '' }) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold uppercase text-cefi-earth/70 mb-1">Contact Person Name *</label>
+                  <label htmlFor="quote-contact-person" className="block text-xs font-semibold uppercase text-cefi-earth/70 mb-1">Contact Person Name *</label>
                   <input
+                    id="quote-contact-person"
+                    name="contactPerson"
                     type="text"
                     required
                     placeholder="Full name"
@@ -137,8 +143,10 @@ export default function QuoteModal({ isOpen, onClose, initialProduct = '' }) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold uppercase text-cefi-earth/70 mb-1">Business Email *</label>
+                  <label htmlFor="quote-email" className="block text-xs font-semibold uppercase text-cefi-earth/70 mb-1">Business Email *</label>
                   <input
+                    id="quote-email"
+                    name="email"
                     type="email"
                     required
                     placeholder="buyer@company.com"
@@ -149,8 +157,10 @@ export default function QuoteModal({ isOpen, onClose, initialProduct = '' }) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold uppercase text-cefi-earth/70 mb-1">Phone / WhatsApp</label>
+                  <label htmlFor="quote-phone" className="block text-xs font-semibold uppercase text-cefi-earth/70 mb-1">Phone / WhatsApp</label>
                   <input
+                    id="quote-phone"
+                    name="phone"
                     type="text"
                     placeholder="+1 555-0192"
                     value={formData.phone}
@@ -160,8 +170,10 @@ export default function QuoteModal({ isOpen, onClose, initialProduct = '' }) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold uppercase text-cefi-earth/70 mb-1">Estimated Quantity *</label>
+                  <label htmlFor="quote-estimated-quantity" className="block text-xs font-semibold uppercase text-cefi-earth/70 mb-1">Estimated Quantity *</label>
                   <select
+                    id="quote-estimated-quantity"
+                    name="estimatedQuantity"
                     value={formData.estimatedQuantity}
                     onChange={e => setFormData({ ...formData, estimatedQuantity: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-cefi-green"
@@ -176,8 +188,10 @@ export default function QuoteModal({ isOpen, onClose, initialProduct = '' }) {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase text-cefi-earth/70 mb-1">Target Destination Port / Country</label>
+                <label htmlFor="quote-target-destination" className="block text-xs font-semibold uppercase text-cefi-earth/70 mb-1">Target Destination Port / Country</label>
                 <input
+                  id="quote-target-destination"
+                  name="targetDestination"
                   type="text"
                   placeholder="e.g. Rotterdam, Netherlands / Hamburg, Germany"
                   value={formData.targetDestination}
@@ -187,8 +201,10 @@ export default function QuoteModal({ isOpen, onClose, initialProduct = '' }) {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase text-cefi-earth/70 mb-1">Additional Specifications / OEM Packaging Request</label>
+                <label htmlFor="quote-notes" className="block text-xs font-semibold uppercase text-cefi-earth/70 mb-1">Additional Specifications / OEM Packaging Request</label>
                 <textarea
+                  id="quote-notes"
+                  name="notes"
                   rows="3"
                   placeholder="Specify leaf grade, mesh size, private labeling details, or certifications required (USDA Organic, ISO 22000, Halal)..."
                   value={formData.notes}

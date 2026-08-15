@@ -223,6 +223,8 @@ export default function Header({ onOpenQuoteModal }) {
             <form onSubmit={handleSearchSubmit} className="flex items-center space-x-2">
               <Search className="w-5 h-5 text-cefi-gold" />
               <input
+                id="header-search-desktop"
+                name="search"
                 type="text"
                 autoFocus
                 placeholder="Search Ceylon Tea, Cinnamon, Spices, Herbal Elixirs, Dried Mango..."
@@ -248,6 +250,8 @@ export default function Header({ onOpenQuoteModal }) {
               <form onSubmit={handleSearchSubmit} className="flex items-center space-x-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
                 <Search className="w-4 h-4 text-gray-400" />
                 <input
+                  id="header-search-mobile"
+                  name="search"
                   type="text"
                   placeholder="Search products..."
                   value={searchQuery}

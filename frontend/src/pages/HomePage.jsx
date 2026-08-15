@@ -454,6 +454,8 @@ export default function HomePage({ onOpenQuoteModal }) {
               ) : (
                 <form onSubmit={handleNewsletter} className="pt-2 flex flex-col sm:flex-row items-center gap-3 max-w-md mx-auto lg:mx-0">
                   <input
+                    id="homepage-newsletter-email"
+                    name="email"
                     type="email"
                     required
                     placeholder="Enter your email address"

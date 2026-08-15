@@ -204,8 +204,10 @@ export default function CheckoutPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Full Name *</label>
+                <label htmlFor="checkout-name" className="block text-xs font-bold uppercase text-gray-500 mb-1">Full Name *</label>
                 <input
+                  id="checkout-name"
+                  name="name"
                   type="text" required
                   placeholder="Jane Smith"
                   value={formData.name}
@@ -214,8 +216,10 @@ export default function CheckoutPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Email Address *</label>
+                <label htmlFor="checkout-email" className="block text-xs font-bold uppercase text-gray-500 mb-1">Email Address *</label>
                 <input
+                  id="checkout-email"
+                  name="email"
                   type="email" required
                   placeholder="jane@example.com"
                   value={formData.email}
@@ -227,8 +231,10 @@ export default function CheckoutPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Phone Number *</label>
+                <label htmlFor="checkout-phone" className="block text-xs font-bold uppercase text-gray-500 mb-1">Phone Number *</label>
                 <input
+                  id="checkout-phone"
+                  name="phone"
                   type="tel" required
                   placeholder="+94 77 123 4567"
                   value={formData.phone}
@@ -237,8 +243,10 @@ export default function CheckoutPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Country *</label>
+                <label htmlFor="checkout-country" className="block text-xs font-bold uppercase text-gray-500 mb-1">Country *</label>
                 <input
+                  id="checkout-country"
+                  name="country"
                   type="text" required
                   value={formData.country}
                   onChange={e => setFormData({ ...formData, country: e.target.value })}
@@ -248,8 +256,10 @@ export default function CheckoutPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Street Address *</label>
+              <label htmlFor="checkout-address" className="block text-xs font-bold uppercase text-gray-500 mb-1">Street Address *</label>
               <input
+                id="checkout-address"
+                name="address"
                 type="text" required
                 placeholder="House number and street name"
                 value={formData.address}
@@ -260,8 +270,10 @@ export default function CheckoutPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold uppercase text-gray-500 mb-1">City *</label>
+                <label htmlFor="checkout-city" className="block text-xs font-bold uppercase text-gray-500 mb-1">City *</label>
                 <input
+                  id="checkout-city"
+                  name="city"
                   type="text" required
                   value={formData.city}
                   onChange={e => setFormData({ ...formData, city: e.target.value })}
@@ -269,8 +281,10 @@ export default function CheckoutPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Postal Code</label>
+                <label htmlFor="checkout-postal-code" className="block text-xs font-bold uppercase text-gray-500 mb-1">Postal Code</label>
                 <input
+                  id="checkout-postal-code"
+                  name="postalCode"
                   type="text"
                   value={formData.postalCode}
                   onChange={e => setFormData({ ...formData, postalCode: e.target.value })}

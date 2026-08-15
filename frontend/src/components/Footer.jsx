@@ -193,6 +193,8 @@ export default function Footer() {
             ) : (
               <form onSubmit={handleSubscribe} className="flex items-center space-x-1.5">
                 <input
+                  id="footer-newsletter-email"
+                  name="email"
                   type="email"
                   required
                   placeholder="Enter email address"
