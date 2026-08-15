@@ -163,14 +163,10 @@ export default function CheckoutPage() {
             <div className="divide-y divide-gray-100 text-xs">
               {orderDetails.items.map((item, idx) => (
                 <div key={idx} className="py-2.5 flex justify-between items-center">
-                  <span className="font-medium text-cefi-earth">• {item.name} × {item.quantity}</span>
-                  <span className="font-bold text-cefi-green">${(item.price * item.quantity).toFixed(2)}</span>
+                  <span className="font-medium text-cefi-earth">• {item.name}</span>
+                  <span className="font-bold text-cefi-green bg-emerald-50 px-2.5 py-1 rounded-full text-xs">Qty: {item.quantity}</span>
                 </div>
               ))}
-            </div>
-            <div className="pt-2 border-t border-gray-200 flex justify-between text-sm font-bold">
-              <span className="text-cefi-earth">Total Amount:</span>
-              <span className="text-cefi-green font-serif text-base">${orderDetails.total.toFixed(2)}</span>
             </div>
           </div>
 
@@ -305,36 +301,31 @@ export default function CheckoutPage() {
               Order Summary
             </h3>
 
-            <div className="divide-y divide-gray-100 max-h-64 overflow-y-auto pr-1">
+            <div className="divide-y divide-gray-100 max-h-72 overflow-y-auto pr-1">
               {cart.map(item => (
                 <div key={item.id} className="py-3 flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     {item.image && <img src={item.image} alt="" className="w-11 h-11 object-cover rounded-lg" />}
                     <div>
                       <p className="text-xs font-semibold text-cefi-earth line-clamp-1">{item.name}</p>
-                      <span className="text-[11px] text-gray-400">Qty: {item.quantity}</span>
+                      <span className="text-[11px] text-gray-500">Quantity: <strong className="text-cefi-green">{item.quantity}</strong></span>
                     </div>
                   </div>
-                  <span className="font-serif font-bold text-sm text-cefi-green">
-                    ${(item.price * item.quantity).toFixed(2)}
+                  <span className="text-xs font-bold text-cefi-green bg-emerald-50 px-2.5 py-1 rounded-full">
+                    {item.quantity} {item.quantity > 1 ? 'Units' : 'Unit'}
                   </span>
                 </div>
               ))}
             </div>
 
-            <div className="pt-3 border-t border-gray-100 space-y-1.5 text-xs text-gray-600">
-              <div className="flex justify-between">
-                <span>Subtotal</span>
-                <span className="font-bold text-cefi-earth">${cartTotal.toFixed(2)}</span>
+            <div className="pt-3 border-t border-gray-100 space-y-2 text-xs text-gray-600 bg-cefi-cream/30 p-3.5 rounded-2xl">
+              <div className="flex justify-between items-center">
+                <span className="font-medium text-cefi-earth">Total Selected Items</span>
+                <span className="font-bold text-cefi-green text-sm">{cart.reduce((sum, item) => sum + (item.quantity || 1), 0)} items</span>
               </div>
-              <div className="flex justify-between">
-                <span>Shipping</span>
-                <span className="font-bold text-cefi-earth">{shippingCost === 0 ? 'FREE' : `$${shippingCost.toFixed(2)}`}</span>
-              </div>
-              <div className="pt-2 border-t border-gray-100 flex justify-between">
-                <span className="font-bold text-cefi-earth text-sm">Total</span>
-                <span className="font-serif font-bold text-2xl text-cefi-green">${grandTotal.toFixed(2)}</span>
-              </div>
+              <p className="text-[11px] text-gray-500 leading-normal border-t border-gray-100/80 pt-2">
+                📦 All product specifications and delivery details will be dispatched to <strong>{COMPANY_ORDER_EMAIL}</strong> for proforma invoice issuance.
+              </p>
             </div>
 
             <button

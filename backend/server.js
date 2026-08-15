@@ -596,15 +596,14 @@ async function sendOrderEmail(orderRecord) {
 
   const itemsHtml = items.map(item => `
     <tr>
-      <td style="padding: 10px; border-bottom: 1px solid #eee; font-weight: bold; color: #1F532E;">${item.name}</td>
-      <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
-      <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">$${item.price ? (item.price * item.quantity).toFixed(2) : '0.00'}</td>
+      <td style="padding: 10px 14px; border-bottom: 1px solid #eee; font-weight: bold; color: #1F532E;">${item.name}</td>
+      <td style="padding: 10px 14px; border-bottom: 1px solid #eee; text-align: center; font-weight: bold; color: #1F532E; background-color: #f8fafc;">${item.quantity} ${item.quantity > 1 ? 'Units' : 'Unit'}</td>
     </tr>
   `).join('');
 
-  const itemsText = items.map(item => `• ${item.name} (Qty: ${item.quantity}) - $${(item.price * item.quantity).toFixed(2)}`).join('\n');
+  const itemsText = items.map(item => `• ${item.name} (Quantity: ${item.quantity})`).join('\n');
 
-  const subject = `🛒 New CEFI Order [${orderRecord.orderId}] - ${customer.name || 'Customer'}`;
+  const subject = `🛒 New CEFI Export Order Request [${orderRecord.orderId}] - ${customer.name || 'Customer'}`;
 
   const htmlContent = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
@@ -620,34 +619,27 @@ async function sendOrderEmail(orderRecord) {
 
         <h3 style="color: #1F532E; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; font-size: 15px;">Customer & Delivery Details</h3>
         <table style="width: 100%; font-size: 13px; line-height: 1.6; margin-bottom: 20px;">
-          <tr><td style="width: 130px; font-weight: bold; color: #64748b;">Full Name:</td><td><strong>${customer.name}</strong></td></tr>
+          <tr><td style="width: 140px; font-weight: bold; color: #64748b;">Full Name:</td><td><strong>${customer.name}</strong></td></tr>
           <tr><td style="font-weight: bold; color: #64748b;">Email Address:</td><td><a href="mailto:${customer.email}" style="color: #1F532E; font-weight: bold;">${customer.email}</a></td></tr>
-          <tr><td style="font-weight: bold; color: #64748b;">Phone Number:</td><td><strong>${customer.phone || 'N/A'}</strong></td></tr>
+          <tr><td style="font-weight: bold; color: #64748b;">Phone / WhatsApp:</td><td><strong>${customer.phone || 'N/A'}</strong></td></tr>
           <tr><td style="font-weight: bold; color: #64748b;">Delivery Address:</td><td>${customer.address || ''}, ${customer.city || ''}, ${customer.postalCode || ''}, ${customer.country || ''}</td></tr>
         </table>
 
-        <h3 style="color: #1F532E; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; font-size: 15px;">Ordered Products</h3>
-        <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px;">
+        <h3 style="color: #1F532E; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; font-size: 15px;">Requested Products</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; border: 1px solid #e2e8f0; border-radius: 8px;">
           <thead>
             <tr style="background-color: #f1f5f9; text-align: left; color: #475569;">
-              <th style="padding: 8px 10px;">Product</th>
-              <th style="padding: 8px 10px; text-align: center;">Qty</th>
-              <th style="padding: 8px 10px; text-align: right;">Subtotal</th>
+              <th style="padding: 10px 14px;">Product</th>
+              <th style="padding: 10px 14px; text-align: center;">Requested Quantity</th>
             </tr>
           </thead>
           <tbody>
             ${itemsHtml}
           </tbody>
-          <tfoot>
-            <tr>
-              <td colspan="2" style="padding: 12px 10px; font-weight: bold; text-align: right; font-size: 14px;">Total Amount:</td>
-              <td style="padding: 12px 10px; font-weight: bold; text-align: right; color: #1F532E; font-size: 16px;">$${Number(orderRecord.total || 0).toFixed(2)}</td>
-            </tr>
-          </tfoot>
         </table>
 
         <div style="background-color: #ecfdf5; border-left: 4px solid #1F532E; padding: 12px 16px; border-radius: 6px; font-size: 12px; color: #065f46;">
-          <strong>Order Type:</strong> ${orderRecord.paymentMethod || 'Direct Email Order'} — Please verify dispatch timeline and issue proforma invoice to customer.
+          <strong>Order Type:</strong> ${orderRecord.paymentMethod || 'Direct Export Order'} — Please review dispatch inventory and contact client with proforma invoice.
         </div>
       </div>
       <div style="background-color: #f8fafc; padding: 14px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
@@ -674,7 +666,7 @@ async function sendOrderEmail(orderRecord) {
         replyTo: customer.email,
         subject: subject,
         headers: { 'X-Priority': '1', 'X-MSMail-Priority': 'High', 'Importance': 'High' },
-        text: `New Order: ${orderRecord.orderId}\nCustomer: ${customer.name} (${customer.email})\nPhone: ${customer.phone}\nAddress: ${customer.address}, ${customer.city}, ${customer.country}\n\nProducts:\n${itemsText}\n\nTotal: $${orderRecord.total}`,
+        text: `New Order: ${orderRecord.orderId}\nCustomer: ${customer.name} (${customer.email})\nPhone: ${customer.phone}\nAddress: ${customer.address}, ${customer.city}, ${customer.country}\n\nProducts:\n${itemsText}`,
         html: htmlContent,
       });
       console.log(`✅ [Nodemailer] Order notification delivered to ${targetEmail}`);
@@ -685,36 +677,29 @@ async function sendOrderEmail(orderRecord) {
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
             <div style="background-color: #1F532E; color: #ffffff; padding: 24px; text-align: center;">
               <h2 style="margin: 0; color: #D4AF37; font-size: 22px;">Ceylon Eco Fresh Infinity (Pvt) Ltd</h2>
-              <p style="margin: 6px 0 0; font-size: 13px; color: #d1fae5;">Order Confirmation</p>
+              <p style="margin: 6px 0 0; font-size: 13px; color: #d1fae5;">Order Request Received</p>
             </div>
             <div style="padding: 24px; color: #334155;">
               <p style="font-size: 15px; margin: 0 0 4px;">Dear <strong>${customer.name}</strong>,</p>
-              <p style="font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 20px;">Thank you for your order! We have received it and our team will contact you within <strong>24 hours</strong> to confirm dispatch details and arrange payment.</p>
+              <p style="font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 20px;">Thank you for your order request! We have received it and our export team will contact you within <strong>24 hours</strong> to confirm stock availability, logistics, and dispatch schedule.</p>
               <div style="background-color: #f0fdf4; padding: 12px 16px; border-radius: 10px; margin-bottom: 20px;">
-                <p style="margin: 0; font-size: 14px;"><strong>Order ID:</strong> <span style="font-family: monospace; color: #1F532E; font-weight: bold;">${orderRecord.orderId}</span></p>
+                <p style="margin: 0; font-size: 14px;"><strong>Order Reference:</strong> <span style="font-family: monospace; color: #1F532E; font-weight: bold;">${orderRecord.orderId}</span></p>
                 <p style="margin: 4px 0 0; font-size: 12px; color: #64748b;">Date: ${new Date().toLocaleString()}</p>
               </div>
-              <h3 style="color: #1F532E; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; font-size: 14px;">Your Order Summary</h3>
-              <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px;">
+              <h3 style="color: #1F532E; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; font-size: 14px;">Your Requested Items</h3>
+              <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; border: 1px solid #e2e8f0; border-radius: 8px;">
                 <thead>
                   <tr style="background-color: #f1f5f9; text-align: left; color: #475569;">
-                    <th style="padding: 8px 10px;">Product</th>
-                    <th style="padding: 8px 10px; text-align: center;">Qty</th>
-                    <th style="padding: 8px 10px; text-align: right;">Subtotal</th>
+                    <th style="padding: 10px 14px;">Product</th>
+                    <th style="padding: 10px 14px; text-align: center;">Quantity</th>
                   </tr>
                 </thead>
                 <tbody>${itemsHtml}</tbody>
-                <tfoot>
-                  <tr>
-                    <td colspan="2" style="padding: 12px 10px; font-weight: bold; text-align: right; font-size: 14px;">Total Amount:</td>
-                    <td style="padding: 12px 10px; font-weight: bold; text-align: right; color: #1F532E; font-size: 16px;">$${Number(orderRecord.total || 0).toFixed(2)}</td>
-                  </tr>
-                </tfoot>
               </table>
               <div style="background-color: #f8fafc; border-left: 4px solid #D4AF37; padding: 12px 16px; border-radius: 6px; font-size: 13px; color: #92400e; margin-bottom: 16px;">
-                <strong>Delivery To:</strong> ${customer.address || ''}, ${customer.city || ''}, ${customer.postalCode || ''}, ${customer.country || ''}
+                <strong>Delivery Destination:</strong> ${customer.address || ''}, ${customer.city || ''}, ${customer.postalCode || ''}, ${customer.country || ''}
               </div>
-              <p style="font-size: 13px; color: #64748b;">If you have any questions, reply to this email or contact us at <a href="tel:+94714634485" style="color: #1F532E;">+94 714 634 485</a>.</p>
+              <p style="font-size: 13px; color: #64748b;">If you have any questions, reply to this email or contact us at <a href="tel:+94714634485" style="color: #1F532E;">+94 714 634 485</a> (WhatsApp available).</p>
             </div>
             <div style="background-color: #f8fafc; padding: 14px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
               Ceylon Eco Fresh Infinity (Pvt) Ltd · No. 278/1/A, Meegasmulla, Dedigamuwa · ceylonecofreshinfinity@gmail.com
@@ -724,8 +709,8 @@ async function sendOrderEmail(orderRecord) {
         await transporter.sendMail({
           from: `"Ceylon Eco Fresh Infinity" <${process.env.EMAIL_USER}>`,
           to: customer.email,
-          subject: `✅ Order Confirmed [${orderRecord.orderId}] — Ceylon Eco Fresh Infinity`,
-          text: `Dear ${customer.name},\n\nThank you for your order! Your Order ID is: ${orderRecord.orderId}\n\nProducts:\n${itemsText}\n\nTotal: $${orderRecord.total}\n\nDelivery to: ${customer.address}, ${customer.city}, ${customer.country}\n\nWe will contact you within 24 hours to confirm dispatch.\n\nBest regards,\nCeylon Eco Fresh Infinity`,
+          subject: `✅ Order Received [${orderRecord.orderId}] — Ceylon Eco Fresh Infinity`,
+          text: `Dear ${customer.name},\n\nThank you for your order! Your Order ID is: ${orderRecord.orderId}\n\nProducts:\n${itemsText}\n\nDelivery to: ${customer.address}, ${customer.city}, ${customer.country}\n\nWe will contact you within 24 hours.\n\nBest regards,\nCeylon Eco Fresh Infinity`,
           html: customerOrderHtml,
         });
         console.log(`✅ [Nodemailer] Order confirmation sent to customer: ${customer.email}`);
@@ -748,7 +733,6 @@ async function sendOrderEmail(orderRecord) {
       customer_phone: customer.phone,
       delivery_address: `${customer.address}, ${customer.city}, ${customer.country}`,
       products: itemsText,
-      total_due: `$${Number(orderRecord.total || 0).toFixed(2)}`,
       date: new Date().toLocaleString()
     };
 
@@ -771,8 +755,10 @@ async function sendOrderEmail(orderRecord) {
 }
 
 app.post('/api/orders', async (req, res) => {
-  const { customer, items, total, paymentMethod, targetEmail } = req.body;
-  if (!customer || !items || total === undefined || total === null || total === '') return res.status(400).json({ success: false, message: 'Invalid order data.' });
+  const { customer, items, paymentMethod, targetEmail } = req.body;
+  if (!customer || !items || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ success: false, message: 'Invalid order data: customer details and items are required.' });
+  }
 
   const orderId = `CEFI-ORD-${Math.floor(100000 + Math.random() * 900000)}`;
   const destinationEmail = targetEmail || 'ceylonecofreshinfinity@gmail.com';
@@ -780,14 +766,13 @@ app.post('/api/orders', async (req, res) => {
     orderId,
     customer,
     items,
-    total,
-    paymentMethod: paymentMethod || 'Direct Email Order',
+    paymentMethod: paymentMethod || 'Direct Export Order Request',
     targetEmail: destinationEmail,
     status: 'Confirmed',
     createdAt: new Date().toISOString()
   };
   localOrders.unshift(orderRecord);
-  console.log(`🛒 New Order Received [${orderId}] Total: $${total}`);
+  console.log(`🛒 New Order Received [${orderId}] with ${items.length} items from ${customer.name}`);
 
   // Trigger Email Dispatch to ceylonecofreshinfinity@gmail.com
   sendOrderEmail(orderRecord).catch(err => console.error('Email send error:', err));

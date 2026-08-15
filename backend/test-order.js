@@ -2,7 +2,7 @@ const http = require('http');
 
 const orderPayload = JSON.stringify({
   customer: {
-    name: 'Test Customer',
+    name: 'Venuja Rana',
     email: 'venujarana26@gmail.com',
     phone: '+94 71 463 4485',
     address: '80/44/c Panaluwa, Watareka',
@@ -11,11 +11,10 @@ const orderPayload = JSON.stringify({
     country: 'Sri Lanka'
   },
   items: [
-    { name: 'Ceylon Cinnamon', quantity: 2, price: 12.50 },
-    { name: 'Rambutan', quantity: 1, price: 8.00 }
+    { name: 'Soursop Flavored Black Tea', quantity: 2 },
+    { name: 'Pure Ceylon Cinnamon Quills (ALBA Grade)', quantity: 5 }
   ],
-  total: 33.00,
-  paymentMethod: 'Direct Email Order',
+  paymentMethod: 'Direct Export Order Request',
   targetEmail: 'ceylonecofreshinfinity@gmail.com'
 });
 
