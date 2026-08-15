@@ -3,8 +3,8 @@ const http = require('http');
 const orderPayload = JSON.stringify({
   customer: {
     name: 'Test Customer',
-    email: 'ceylonecofreshinfinity@gmail.com',
-    phone: '+94 77 123 4567',
+    email: 'venujarana26@gmail.com',
+    phone: '+94 71 463 4485',
     address: '80/44/c Panaluwa, Watareka',
     city: 'Colombo',
     postalCode: '10600',

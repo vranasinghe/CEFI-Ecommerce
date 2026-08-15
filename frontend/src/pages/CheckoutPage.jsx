@@ -14,7 +14,7 @@ export default function CheckoutPage() {
 
   const [formData, setFormData] = useState({
     name: user?.name || '',
-    email: user?.email || '',
+    email: '',           // Always start empty — customer must enter their own contact email
     phone: '',
     address: '',
     city: 'Colombo',
@@ -31,13 +31,14 @@ export default function CheckoutPage() {
   const shippingCost = cartTotal > 100 || cartTotal === 0 ? 0 : 15.00;
   const grandTotal = cartTotal + shippingCost;
 
-  // Pre-fill from logged-in user
+  // Pre-fill name only from logged-in user (not email — customer must enter their own)
   React.useEffect(() => {
     if (user) {
       setFormData(prev => ({
         ...prev,
         name: prev.name || user.name || user.user_metadata?.full_name || '',
-        email: prev.email || user.email || '',
+        // Do NOT pre-fill email — the logged-in account email may be a company/admin email.
+        // The customer should always type the email where they want to receive their order confirmation.
       }));
     }
   }, [user]);
