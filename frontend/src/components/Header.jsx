@@ -226,6 +226,7 @@ export default function Header({ onOpenQuoteModal }) {
                 id="header-search-desktop"
                 name="search"
                 type="text"
+                autoComplete="off"
                 autoFocus
                 placeholder="Search Ceylon Tea, Cinnamon, Spices, Herbal Elixirs, Dried Mango..."
                 value={searchQuery}
@@ -253,6 +254,7 @@ export default function Header({ onOpenQuoteModal }) {
                   id="header-search-mobile"
                   name="search"
                   type="text"
+                  autoComplete="off"
                   placeholder="Search products..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}

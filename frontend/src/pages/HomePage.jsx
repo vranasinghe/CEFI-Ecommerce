@@ -457,6 +457,7 @@ export default function HomePage({ onOpenQuoteModal }) {
                     id="homepage-newsletter-email"
                     name="email"
                     type="email"
+                    autoComplete="email"
                     required
                     placeholder="Enter your email address"
                     value={newsletterEmail}
