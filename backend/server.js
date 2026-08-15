@@ -772,7 +772,8 @@ async function sendOrderEmail(orderRecord) {
 
 app.post('/api/orders', async (req, res) => {
   const { customer, items, total, paymentMethod, targetEmail } = req.body;
-  if (!customer || !items || !total) return res.status(400).json({ success: false, message: 'Invalid order data.' });
+  if (!customer || !items || total === undefined || total === null || total === '') return res.status(400).json({ success: false, message: 'Invalid order data.' });
+
   const orderId = `CEFI-ORD-${Math.floor(100000 + Math.random() * 900000)}`;
   const destinationEmail = targetEmail || 'ceylonecofreshinfinity@gmail.com';
   const orderRecord = {
