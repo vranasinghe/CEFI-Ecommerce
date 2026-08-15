@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="cefiGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1F532E" />
+      <stop offset="100%" stop-color="#0e3419" />
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FCD34D" />
+      <stop offset="100%" stop-color="#D4AF37" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background Circle -->
+  <circle cx="32" cy="32" r="30" fill="url(#cefiGrad)" stroke="#D4AF37" stroke-width="2.5" />
+
+  <!-- Coconut / Ceylon Palm Trunk -->
+  <path d="M26 48 C28 38, 33 32, 36 22" stroke="#D4AF37" stroke-width="3" stroke-linecap="round" fill="none" />
+  
+  <!-- Palm Fronds / Organic Leaves -->
+  <path d="M36 22 C32 14, 20 16, 14 20 C20 22, 28 23, 36 22 Z" fill="url(#goldGrad)" />
+  <path d="M36 22 C42 13, 50 15, 54 21 C47 22, 41 23, 36 22 Z" fill="url(#goldGrad)" />
+  <path d="M36 22 C36 12, 31 8, 25 9 C28 14, 32 18, 36 22 Z" fill="#10b981" />
+  <path d="M36 22 C38 11, 45 9, 49 11 C46 15, 41 19, 36 22 Z" fill="#10b981" />
+  <path d="M36 22 C30 26, 22 28, 16 33 C23 32, 30 29, 36 22 Z" fill="#D4AF37" opacity="0.9" />
+  <path d="M36 22 C42 26, 48 29, 52 34 C46 32, 40 28, 36 22 Z" fill="#D4AF37" opacity="0.9" />
+
+  <!-- Sun / Ocean Curve at Base -->
+  <path d="M18 47 C24 44, 38 44, 46 47" stroke="#FCD34D" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.85" />
+  <path d="M22 51 C28 49, 36 49, 42 51" stroke="#10b981" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.8" />
+</svg>

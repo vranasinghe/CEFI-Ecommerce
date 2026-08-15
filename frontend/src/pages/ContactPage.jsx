@@ -2,12 +2,10 @@ import React, { useState, useRef } from 'react';
 import emailjs from '@emailjs/browser';
 import { Mail, Phone, MapPin, Send, CheckCircle2, Globe, Clock, Building } from 'lucide-react';
 
-// ── EmailJS Configuration ──────────────────────────────────────────────────
+// ── EmailJS Configuration (Fallback) ────────────────────────────────────────
 const EMAILJS_SERVICE_ID  = 'service_esc398x';
 const EMAILJS_TEMPLATE_ID = 'template_an5f25r';
 const EMAILJS_PUBLIC_KEY  = 'zNFcAnT75D9PGlHIR';
-// Initialize EmailJS with public key
-emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
 // ──────────────────────────────────────────────────────────────────────────
 
 export default function ContactPage() {
