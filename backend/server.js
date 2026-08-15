@@ -438,6 +438,7 @@ ${message}
         },
       });
 
+      // 1. Notify CEFI admin
       await transporter.sendMail({
         from: `"CEFI Contact Form" <${process.env.EMAIL_USER}>`,
         to: targetEmail,
@@ -447,6 +448,39 @@ ${message}
         html: htmlContent,
       });
       console.log(`✅ [Nodemailer] Contact email successfully delivered to ${targetEmail} from ${email}`);
+
+      // 2. Send confirmation email to the customer
+      if (email && email !== targetEmail) {
+        const customerConfirmHtml = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
+            <div style="background-color: #1F532E; color: #ffffff; padding: 24px; text-align: center;">
+              <h2 style="margin: 0; color: #D4AF37; font-size: 22px;">Ceylon Eco Fresh Infinity (Pvt) Ltd</h2>
+              <p style="margin: 6px 0 0; font-size: 13px; color: #d1fae5;">We've received your message!</p>
+            </div>
+            <div style="padding: 24px; color: #334155;">
+              <p style="font-size: 15px; margin: 0 0 16px;">Dear <strong>${name}</strong>,</p>
+              <p style="font-size: 14px; color: #475569; line-height: 1.6;">Thank you for contacting Ceylon Eco Fresh Infinity. We have received your message and our team will get back to you within <strong>24 hours</strong>.</p>
+              <div style="background-color: #f0fdf4; border-left: 4px solid #1F532E; padding: 14px 16px; border-radius: 8px; margin: 20px 0; font-size: 13px; color: #065f46;">
+                <strong>Your Inquiry:</strong> ${subject || 'General Inquiry'}<br/>
+                <strong>Submitted:</strong> ${new Date().toLocaleString()}
+              </div>
+              <p style="font-size: 13px; color: #64748b;">If your matter is urgent, you can reach us directly at <a href="tel:+94714634485" style="color: #1F532E;">+94 714 634 485</a> (WhatsApp available).</p>
+            </div>
+            <div style="background-color: #f8fafc; padding: 14px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
+              Ceylon Eco Fresh Infinity (Pvt) Ltd · No. 278/1/A, Meegasmulla, Dedigamuwa · ceylonecofreshinfinity@gmail.com
+            </div>
+          </div>
+        `;
+        await transporter.sendMail({
+          from: `"Ceylon Eco Fresh Infinity" <${process.env.EMAIL_USER}>`,
+          to: email,
+          subject: `✅ We received your message, ${name.split(' ')[0]}! — CEFI`,
+          text: `Dear ${name},\n\nThank you for contacting Ceylon Eco Fresh Infinity. We have received your message regarding "${subject}" and our team will respond within 24 hours.\n\nFor urgent matters, contact us at +94 714 634 485.\n\nBest regards,\nCeylon Eco Fresh Infinity Team`,
+          html: customerConfirmHtml,
+        });
+        console.log(`✅ [Nodemailer] Contact confirmation sent to customer: ${email}`);
+      }
+
       return { success: true, method: 'smtp' };
     } catch (err) {
       console.error('⚠️ [Nodemailer] Contact email SMTP failed:', err.message);
@@ -501,6 +535,7 @@ ${notes}
         },
       });
 
+      // 1. Notify CEFI admin
       await transporter.sendMail({
         from: `"CEFI Export Quotes" <${process.env.EMAIL_USER}>`,
         to: targetEmail,
@@ -510,6 +545,42 @@ ${notes}
         html: htmlContent,
       });
       console.log(`✅ [Nodemailer] Quote email successfully delivered to ${targetEmail} for ${company}`);
+
+      // 2. Send confirmation email to the client
+      if (email && email !== targetEmail) {
+        const clientConfirmHtml = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
+            <div style="background-color: #1F532E; color: #ffffff; padding: 24px; text-align: center;">
+              <h2 style="margin: 0; color: #D4AF37; font-size: 22px;">Ceylon Eco Fresh Infinity (Pvt) Ltd</h2>
+              <p style="margin: 6px 0 0; font-size: 13px; color: #d1fae5;">Your quotation request has been received!</p>
+            </div>
+            <div style="padding: 24px; color: #334155;">
+              <p style="font-size: 15px; margin: 0 0 16px;">Dear <strong>${name}</strong>,</p>
+              <p style="font-size: 14px; color: #475569; line-height: 1.6;">Thank you for your interest in our products. We have received your wholesale/export quotation request and our trade team will prepare a detailed quote within <strong>1–2 business days</strong>.</p>
+              <div style="background-color: #f0fdf4; border-left: 4px solid #1F532E; padding: 14px 16px; border-radius: 8px; margin: 20px 0; font-size: 13px; color: #065f46;">
+                <strong>Company:</strong> ${company}<br/>
+                <strong>Product Requested:</strong> ${product}<br/>
+                <strong>Estimated Quantity:</strong> ${quantity}<br/>
+                <strong>Destination:</strong> ${targetDestination}<br/>
+                <strong>Submitted:</strong> ${new Date().toLocaleString()}
+              </div>
+              <p style="font-size: 13px; color: #64748b;">For urgent inquiries, please contact us at <a href="tel:+94714634485" style="color: #1F532E;">+94 714 634 485</a> (WhatsApp available).</p>
+            </div>
+            <div style="background-color: #f8fafc; padding: 14px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
+              Ceylon Eco Fresh Infinity (Pvt) Ltd · No. 278/1/A, Meegasmulla, Dedigamuwa · ceylonecofreshinfinity@gmail.com
+            </div>
+          </div>
+        `;
+        await transporter.sendMail({
+          from: `"Ceylon Eco Fresh Infinity" <${process.env.EMAIL_USER}>`,
+          to: email,
+          subject: `✅ Quote Request Received — ${product} | CEFI`,
+          text: `Dear ${name},\n\nThank you for your quotation request for ${product} (${quantity}) to ${targetDestination}.\n\nOur trade team will respond within 1–2 business days with a detailed proforma invoice.\n\nFor urgent matters, contact us at +94 714 634 485.\n\nBest regards,\nCeylon Eco Fresh Infinity Export Team`,
+          html: clientConfirmHtml,
+        });
+        console.log(`✅ [Nodemailer] Quote confirmation sent to client: ${email}`);
+      }
+
       return { success: true, method: 'smtp' };
     } catch (err) {
       console.error('⚠️ [Nodemailer] Quote email SMTP failed:', err.message);
@@ -596,25 +667,70 @@ async function sendOrderEmail(orderRecord) {
         },
       });
 
-      // Build recipient list — CC the customer so email has different TO and CC (prevents Gmail self-email filter)
-      const toList = [targetEmail];
-      const ccList = customer.email && customer.email !== targetEmail ? [customer.email] : [];
-
+      // 1a. Notify CEFI admin
       await transporter.sendMail({
         from: `"CEFI Export Orders" <${process.env.EMAIL_USER}>`,
-        to: toList.join(', '),
-        cc: ccList.join(', ') || undefined,
+        to: targetEmail,
         replyTo: customer.email,
         subject: subject,
-        headers: {
-          'X-Priority': '1',
-          'X-MSMail-Priority': 'High',
-          'Importance': 'High',
-        },
+        headers: { 'X-Priority': '1', 'X-MSMail-Priority': 'High', 'Importance': 'High' },
         text: `New Order: ${orderRecord.orderId}\nCustomer: ${customer.name} (${customer.email})\nPhone: ${customer.phone}\nAddress: ${customer.address}, ${customer.city}, ${customer.country}\n\nProducts:\n${itemsText}\n\nTotal: $${orderRecord.total}`,
         html: htmlContent,
       });
-      console.log(`✅ [Nodemailer] Order email successfully delivered to ${targetEmail}`);
+      console.log(`✅ [Nodemailer] Order notification delivered to ${targetEmail}`);
+
+      // 1b. Send order confirmation to the customer
+      if (customer.email && customer.email !== targetEmail) {
+        const customerOrderHtml = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
+            <div style="background-color: #1F532E; color: #ffffff; padding: 24px; text-align: center;">
+              <h2 style="margin: 0; color: #D4AF37; font-size: 22px;">Ceylon Eco Fresh Infinity (Pvt) Ltd</h2>
+              <p style="margin: 6px 0 0; font-size: 13px; color: #d1fae5;">Order Confirmation</p>
+            </div>
+            <div style="padding: 24px; color: #334155;">
+              <p style="font-size: 15px; margin: 0 0 4px;">Dear <strong>${customer.name}</strong>,</p>
+              <p style="font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 20px;">Thank you for your order! We have received it and our team will contact you within <strong>24 hours</strong> to confirm dispatch details and arrange payment.</p>
+              <div style="background-color: #f0fdf4; padding: 12px 16px; border-radius: 10px; margin-bottom: 20px;">
+                <p style="margin: 0; font-size: 14px;"><strong>Order ID:</strong> <span style="font-family: monospace; color: #1F532E; font-weight: bold;">${orderRecord.orderId}</span></p>
+                <p style="margin: 4px 0 0; font-size: 12px; color: #64748b;">Date: ${new Date().toLocaleString()}</p>
+              </div>
+              <h3 style="color: #1F532E; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; font-size: 14px;">Your Order Summary</h3>
+              <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px;">
+                <thead>
+                  <tr style="background-color: #f1f5f9; text-align: left; color: #475569;">
+                    <th style="padding: 8px 10px;">Product</th>
+                    <th style="padding: 8px 10px; text-align: center;">Qty</th>
+                    <th style="padding: 8px 10px; text-align: right;">Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody>${itemsHtml}</tbody>
+                <tfoot>
+                  <tr>
+                    <td colspan="2" style="padding: 12px 10px; font-weight: bold; text-align: right; font-size: 14px;">Total Amount:</td>
+                    <td style="padding: 12px 10px; font-weight: bold; text-align: right; color: #1F532E; font-size: 16px;">$${Number(orderRecord.total || 0).toFixed(2)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+              <div style="background-color: #f8fafc; border-left: 4px solid #D4AF37; padding: 12px 16px; border-radius: 6px; font-size: 13px; color: #92400e; margin-bottom: 16px;">
+                <strong>Delivery To:</strong> ${customer.address || ''}, ${customer.city || ''}, ${customer.postalCode || ''}, ${customer.country || ''}
+              </div>
+              <p style="font-size: 13px; color: #64748b;">If you have any questions, reply to this email or contact us at <a href="tel:+94714634485" style="color: #1F532E;">+94 714 634 485</a>.</p>
+            </div>
+            <div style="background-color: #f8fafc; padding: 14px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
+              Ceylon Eco Fresh Infinity (Pvt) Ltd · No. 278/1/A, Meegasmulla, Dedigamuwa · ceylonecofreshinfinity@gmail.com
+            </div>
+          </div>
+        `;
+        await transporter.sendMail({
+          from: `"Ceylon Eco Fresh Infinity" <${process.env.EMAIL_USER}>`,
+          to: customer.email,
+          subject: `✅ Order Confirmed [${orderRecord.orderId}] — Ceylon Eco Fresh Infinity`,
+          text: `Dear ${customer.name},\n\nThank you for your order! Your Order ID is: ${orderRecord.orderId}\n\nProducts:\n${itemsText}\n\nTotal: $${orderRecord.total}\n\nDelivery to: ${customer.address}, ${customer.city}, ${customer.country}\n\nWe will contact you within 24 hours to confirm dispatch.\n\nBest regards,\nCeylon Eco Fresh Infinity`,
+          html: customerOrderHtml,
+        });
+        console.log(`✅ [Nodemailer] Order confirmation sent to customer: ${customer.email}`);
+      }
+
       return { success: true, method: 'smtp' };
     } catch (smtpErr) {
       console.warn('⚠️ [Nodemailer] SMTP failed, attempting fallback API delivery:', smtpErr.message);
