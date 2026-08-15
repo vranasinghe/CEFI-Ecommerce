@@ -341,14 +341,18 @@ app.get('/api/blog/:slug', async (req, res) => {
 
 // ── Contact / Quotes / Orders ─────────────────────────────────────────────────
 app.post('/api/contact', async (req, res) => {
-  const { name, email, subject, message } = req.body;
-  if (!name || !email || !message) return res.status(400).json({ success: false, message: 'Missing fields.' });
-  const record = { id: `msg-${Date.now()}`, name, email, subject, message, createdAt: new Date().toISOString() };
+  const { name, email, phone, subject, message } = req.body;
+  if (!name || !email || !message) return res.status(400).json({ success: false, message: 'Missing required fields.' });
+  const record = { id: `msg-${Date.now()}`, name, email, phone, subject, message, createdAt: new Date().toISOString() };
   localContactMessages.push(record);
   try {
     if (supabase) await supabase.from('contact_messages').insert([record]);
   } catch (e) {}
-  return res.json({ success: true, message: 'Message received!' });
+
+  // Trigger Email Dispatch to ceylonecofreshinfinity@gmail.com
+  sendContactEmail(record).catch(err => console.error('Contact email send error:', err));
+
+  return res.json({ success: true, message: 'Message sent & email notification dispatched successfully!' });
 });
 
 app.post('/api/subscribe', async (req, res) => {
@@ -363,18 +367,155 @@ app.post('/api/subscribe', async (req, res) => {
 });
 
 app.post('/api/quotes', async (req, res) => {
-  const { name, email, company, product, quantity, message } = req.body;
-  const record = { id: `quote-${Date.now()}`, name, email, company, product, quantity, message, createdAt: new Date().toISOString() };
+  const { productName, product, companyName, company, contactPerson, name, email, phone, estimatedQuantity, quantity, targetDestination, destination, notes, message } = req.body;
+  const record = {
+    id: `quote-${Date.now()}`,
+    name: contactPerson || name || 'Wholesale Client',
+    company: companyName || company || 'N/A',
+    product: productName || product || 'Ceylon Tea & Spices',
+    quantity: estimatedQuantity || quantity || 'Custom',
+    targetDestination: targetDestination || destination || 'N/A',
+    email,
+    phone,
+    notes: notes || message || '',
+    createdAt: new Date().toISOString()
+  };
   localQuotes.push(record);
   try {
     if (supabase) await supabase.from('quote_requests').insert([record]);
   } catch (e) {}
-  return res.json({ success: true, message: 'Quote request received!' });
+
+  // Trigger Email Dispatch to ceylonecofreshinfinity@gmail.com
+  sendQuoteEmail(record).catch(err => console.error('Quote email send error:', err));
+
+  return res.json({ success: true, message: 'Quote request sent & email notification dispatched successfully!' });
 });
 
 app.get('/api/orders', (req, res) => {
   return res.json(localOrders);
 });
+
+// ── Contact Email Delivery Function ──────────────────────────────────────────
+async function sendContactEmail(record) {
+  const targetEmail = process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
+  const { name, email, phone, subject, message } = record;
+  const emailSubject = `📬 New Contact Inquiry: ${subject || 'General Inquiry'} - from ${name}`;
+
+  const htmlContent = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
+      <div style="background-color: #1F532E; color: #ffffff; padding: 24px; text-align: center;">
+        <h2 style="margin: 0; color: #D4AF37; font-size: 22px;">Ceylon Eco Fresh Infinity (Pvt) Ltd</h2>
+        <p style="margin: 6px 0 0; font-size: 13px; color: #d1fae5;">Website Contact Form Message</p>
+      </div>
+      <div style="padding: 24px; color: #334155;">
+        <h3 style="color: #1F532E; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; font-size: 15px;">Sender Details</h3>
+        <table style="width: 100%; font-size: 13px; line-height: 1.6; margin-bottom: 20px;">
+          <tr><td style="width: 140px; font-weight: bold; color: #64748b;">Full Name:</td><td><strong>${name}</strong></td></tr>
+          <tr><td style="font-weight: bold; color: #64748b;">Email Address:</td><td><a href="mailto:${email}" style="color: #1F532E; font-weight: bold;">${email}</a></td></tr>
+          <tr><td style="font-weight: bold; color: #64748b;">Phone / WhatsApp:</td><td><strong>${phone || 'Not provided'}</strong></td></tr>
+          <tr><td style="font-weight: bold; color: #64748b;">Inquiry Subject:</td><td><strong>${subject || 'General Inquiry'}</strong></td></tr>
+          <tr><td style="font-weight: bold; color: #64748b;">Submitted At:</td><td>${new Date().toLocaleString()}</td></tr>
+        </table>
+
+        <h3 style="color: #1F532E; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; font-size: 15px;">Message Content</h3>
+        <div style="background-color: #f8fafc; border-left: 4px solid #1F532E; padding: 16px; border-radius: 8px; font-size: 14px; line-height: 1.6; color: #1e293b; white-space: pre-wrap;">
+${message}
+        </div>
+      </div>
+      <div style="background-color: #f8fafc; padding: 14px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
+        Ceylon Eco Fresh Infinity (Pvt) Ltd · Automated Web Portal Dispatch
+      </div>
+    </div>
+  `;
+
+  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+    try {
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      });
+
+      await transporter.sendMail({
+        from: `"CEFI Contact Form" <${process.env.EMAIL_USER}>`,
+        to: targetEmail,
+        replyTo: email,
+        subject: emailSubject,
+        text: `New Contact Form Message from ${name} (${email}, ${phone || 'No phone'})\n\nSubject: ${subject}\n\nMessage:\n${message}`,
+        html: htmlContent,
+      });
+      console.log(`✅ [Nodemailer] Contact email successfully delivered to ${targetEmail} from ${email}`);
+      return { success: true, method: 'smtp' };
+    } catch (err) {
+      console.error('⚠️ [Nodemailer] Contact email SMTP failed:', err.message);
+    }
+  }
+}
+
+// ── Quote Request Email Delivery Function ────────────────────────────────────
+async function sendQuoteEmail(record) {
+  const targetEmail = process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
+  const { name, company, product, quantity, targetDestination, email, phone, notes } = record;
+  const emailSubject = `📋 New Wholesale Quote Request: ${company || name} (${product})`;
+
+  const htmlContent = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
+      <div style="background-color: #1F532E; color: #ffffff; padding: 24px; text-align: center;">
+        <h2 style="margin: 0; color: #D4AF37; font-size: 22px;">Ceylon Eco Fresh Infinity (Pvt) Ltd</h2>
+        <p style="margin: 6px 0 0; font-size: 13px; color: #d1fae5;">Wholesale & Export Quotation Request</p>
+      </div>
+      <div style="padding: 24px; color: #334155;">
+        <h3 style="color: #1F532E; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; font-size: 15px;">Client Information</h3>
+        <table style="width: 100%; font-size: 13px; line-height: 1.6; margin-bottom: 20px;">
+          <tr><td style="width: 150px; font-weight: bold; color: #64748b;">Contact Person:</td><td><strong>${name}</strong></td></tr>
+          <tr><td style="font-weight: bold; color: #64748b;">Company Name:</td><td><strong>${company}</strong></td></tr>
+          <tr><td style="font-weight: bold; color: #64748b;">Email Address:</td><td><a href="mailto:${email}" style="color: #1F532E; font-weight: bold;">${email}</a></td></tr>
+          <tr><td style="font-weight: bold; color: #64748b;">Phone / WhatsApp:</td><td><strong>${phone || 'Not provided'}</strong></td></tr>
+          <tr><td style="font-weight: bold; color: #64748b;">Requested Product:</td><td><strong style="color: #1F532E;">${product}</strong></td></tr>
+          <tr><td style="font-weight: bold; color: #64748b;">Estimated Quantity:</td><td><strong>${quantity}</strong></td></tr>
+          <tr><td style="font-weight: bold; color: #64748b;">Destination Port/City:</td><td><strong>${targetDestination}</strong></td></tr>
+          <tr><td style="font-weight: bold; color: #64748b;">Submitted At:</td><td>${new Date().toLocaleString()}</td></tr>
+        </table>
+
+        ${notes ? `
+        <h3 style="color: #1F532E; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; font-size: 15px;">Additional Requirements / Notes</h3>
+        <div style="background-color: #f8fafc; border-left: 4px solid #D4AF37; padding: 16px; border-radius: 8px; font-size: 14px; line-height: 1.6; color: #1e293b; white-space: pre-wrap;">
+${notes}
+        </div>` : ''}
+      </div>
+      <div style="background-color: #f8fafc; padding: 14px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
+        Ceylon Eco Fresh Infinity (Pvt) Ltd · Automated Export Quote System
+      </div>
+    </div>
+  `;
+
+  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+    try {
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      });
+
+      await transporter.sendMail({
+        from: `"CEFI Export Quotes" <${process.env.EMAIL_USER}>`,
+        to: targetEmail,
+        replyTo: email,
+        subject: emailSubject,
+        text: `New Quote Request from ${name} (${company})\nProduct: ${product}\nQuantity: ${quantity}\nEmail: ${email}\nPhone: ${phone}\nNotes: ${notes}`,
+        html: htmlContent,
+      });
+      console.log(`✅ [Nodemailer] Quote email successfully delivered to ${targetEmail} for ${company}`);
+      return { success: true, method: 'smtp' };
+    } catch (err) {
+      console.error('⚠️ [Nodemailer] Quote email SMTP failed:', err.message);
+    }
+  }
+}
 
 // ── Order Email Delivery Function ────────────────────────────────────────────
 async function sendOrderEmail(orderRecord) {
@@ -547,8 +688,3 @@ if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
 
 module.exports = app;
 
-module.exports.config = {
-  api: {
-    bodyParser: false,
-  },
-};

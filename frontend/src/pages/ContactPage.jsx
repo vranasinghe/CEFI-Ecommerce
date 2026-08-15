@@ -1,7 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import emailjs from '@emailjs/browser';
 import { Mail, Phone, MapPin, Send, CheckCircle2, Globe, Clock, Building } from 'lucide-react';
 
+// ── EmailJS Configuration ──────────────────────────────────────────────────
+const EMAILJS_SERVICE_ID  = 'service_esc398x';
+const EMAILJS_TEMPLATE_ID = 'template_an5f25r';
+const EMAILJS_PUBLIC_KEY  = 'zNFcAnT75D9PGlHIR';
+// Initialize EmailJS with public key
+emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+// ──────────────────────────────────────────────────────────────────────────
+
 export default function ContactPage() {
+  const formRef = useRef(null);
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -20,6 +31,7 @@ export default function ContactPage() {
     setError('');
 
     try {
+      // 1. Submit to backend API which sends email via authenticated Gmail SMTP
       const res = await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -30,10 +42,47 @@ export default function ContactPage() {
       if (data.success) {
         setSubmitted(true);
       } else {
-        setError(data.message || 'Submission failed.');
+        // If backend returned error, try EmailJS as fallback
+        await emailjs.send(
+          EMAILJS_SERVICE_ID,
+          EMAILJS_TEMPLATE_ID,
+          {
+            to_email: 'ceylonecofreshinfinity@gmail.com',
+            from_name: formData.name,
+            from_email: formData.email,
+            phone: formData.phone,
+            subject: formData.subject,
+            message: formData.message,
+            name: formData.name,
+            email: formData.email,
+          },
+          { publicKey: EMAILJS_PUBLIC_KEY }
+        );
+        setSubmitted(true);
       }
     } catch (err) {
-      setSubmitted(true);
+      console.warn('API error, trying EmailJS fallback:', err);
+      try {
+        await emailjs.send(
+          EMAILJS_SERVICE_ID,
+          EMAILJS_TEMPLATE_ID,
+          {
+            to_email: 'ceylonecofreshinfinity@gmail.com',
+            from_name: formData.name,
+            from_email: formData.email,
+            phone: formData.phone,
+            subject: formData.subject,
+            message: formData.message,
+            name: formData.name,
+            email: formData.email,
+          },
+          { publicKey: EMAILJS_PUBLIC_KEY }
+        );
+        setSubmitted(true);
+      } catch (emailErr) {
+        console.error('All email delivery methods failed:', emailErr);
+        setError('Could not dispatch message. Please email us directly at ceylonecofreshinfinity@gmail.com');
+      }
     } finally {
       setLoading(false);
     }
@@ -127,7 +176,7 @@ export default function ContactPage() {
               </button>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
               <h3 className="font-serif font-bold text-2xl text-cefi-earth mb-6">Send Us a Message</h3>
 
               {error && (
@@ -139,6 +188,7 @@ export default function ContactPage() {
                   <label className="block text-xs font-bold uppercase text-gray-600 mb-1">Your Full Name *</label>
                   <input
                     type="text"
+                    name="name"
                     required
                     placeholder="John Doe"
                     value={formData.name}
@@ -151,6 +201,7 @@ export default function ContactPage() {
                   <label className="block text-xs font-bold uppercase text-gray-600 mb-1">Email Address *</label>
                   <input
                     type="email"
+                    name="email"
                     required
                     placeholder="john@example.com"
                     value={formData.email}
@@ -165,6 +216,7 @@ export default function ContactPage() {
                   <label className="block text-xs font-bold uppercase text-gray-600 mb-1">Phone / WhatsApp</label>
                   <input
                     type="text"
+                    name="phone"
                     placeholder="+94 77 123 4567"
                     value={formData.phone}
                     onChange={e => setFormData({ ...formData, phone: e.target.value })}
@@ -175,6 +227,7 @@ export default function ContactPage() {
                 <div>
                   <label className="block text-xs font-bold uppercase text-gray-600 mb-1">Subject</label>
                   <select
+                    name="subject"
                     value={formData.subject}
                     onChange={e => setFormData({ ...formData, subject: e.target.value })}
                     className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-cefi-green"
@@ -192,6 +245,7 @@ export default function ContactPage() {
                 <label className="block text-xs font-bold uppercase text-gray-600 mb-1">Message *</label>
                 <textarea
                   rows="5"
+                  name="message"
                   required
                   placeholder="How can CEFI assist your business or retail order today?"
                   value={formData.message}
