@@ -50,80 +50,35 @@ export default function CheckoutPage() {
     setLoading(true);
 
     const orderId = `CEFI-ORD-${Math.floor(100000 + Math.random() * 900000)}`;
-    const itemsList = cart.map(item => `- ${item.name} (Qty: ${item.quantity})`).join('\n');
-    const itemsShort = cart.map(item => `${item.name} x${item.quantity}`).join(', ');
-
     let companySent = false;
 
-    // ══ METHOD 1: FormSubmit.co (free, no account, no backend) ════════════════
+    // ══ USE BACKEND API TO GENERATE THE BEAUTIFUL HTML EMAIL ════════════════
     try {
-      const fsRes = await fetch('https://formsubmit.co/ajax/ceylonecofreshinfinity@gmail.com', {
+      // In development, this goes to localhost:5000/api/orders
+      // In production (Vercel), this goes to /backend/server.js via vercel.json
+      const apiRes = await fetch('/api/orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          _subject:      `New Order [${orderId}] from ${formData.name} - CEFI`,
-          _replyto:      formData.email,
-          _captcha:      'false',
-          order_id:      orderId,
-          customer_name: formData.name,
-          customer_email:formData.email,
-          customer_phone:formData.phone,
-          address:       `${formData.address}, ${formData.city}, ${formData.postalCode}, ${formData.country}`,
-          items_ordered: itemsList,
-          order_date:    new Date().toLocaleString(),
+          orderId, 
+          customer: formData, 
+          items: cart,
+          paymentMethod: 'Direct Email Order', 
+          targetEmail: COMPANY_ORDER_EMAIL
         })
       });
-      const fsData = await fsRes.json();
-      if (fsData.success === 'true' || fsData.success === true) {
-        companySent = true;
-        console.log('FormSubmit order email sent successfully!');
+      
+      const apiData = await apiRes.json();
+      companySent = apiData.success === true;
+      
+      if (companySent) {
+        console.log('✅ Backend API order sent successfully with HTML template!');
       } else {
-        console.warn('FormSubmit returned non-success:', fsData);
+        console.error('❌ Backend API failed to send email. Check Vercel ENV vars.');
       }
-    } catch (fsErr) {
-      console.warn('FormSubmit failed:', fsErr.message);
-    }
-
-    // ══ METHOD 2: EmailJS fallback ════════════════════════════════════════════
-    if (!companySent) {
-      try {
-        await emailjs.send(
-          EMAILJS_SERVICE_ID,
-          EMAILJS_TEMPLATE_ID,
-          {
-            to_email:   COMPANY_ORDER_EMAIL,
-            from_name:  formData.name,
-            from_email: formData.email,
-            phone:      formData.phone,
-            subject:    `New Order [${orderId}] from ${formData.name} - CEFI`,
-            message:    `Order: ${orderId}\nName: ${formData.name}\nEmail: ${formData.email}\nPhone: ${formData.phone}\nAddress: ${formData.address}, ${formData.city}, ${formData.country}\nItems: ${itemsShort}`,
-            name:       formData.name,
-            email:      formData.email,
-          },
-          { publicKey: EMAILJS_PUBLIC_KEY }
-        );
-        companySent = true;
-        console.log('EmailJS order email sent!');
-      } catch (ejErr) {
-        console.warn('EmailJS failed:', ejErr?.text || ejErr?.message);
-      }
-    }
-
-    // ══ METHOD 3: Backend API last resort ════════════════════════════════════
-    if (!companySent) {
-      try {
-        const apiRes = await fetch('/api/orders', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            orderId, customer: formData, items: cart,
-            paymentMethod: 'Direct Email Order', targetEmail: COMPANY_ORDER_EMAIL
-          })
-        });
-        const apiData = await apiRes.json();
-        companySent = apiData.success || false;
-        if (companySent) console.log('Backend API order sent!');
-      } catch (_) {}
+    } catch (error) {
+      console.error('❌ Backend API fetch error:', error);
+      companySent = false;
     }
 
     setOrderConfirmed(orderId);
