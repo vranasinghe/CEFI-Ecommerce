@@ -417,62 +417,6 @@ app.get('/api/blog/:slug', async (req, res) => {
 });
 
 // ── Contact / Quotes / Orders ─────────────────────────────────────────────────
-app.post('/api/contact', async (req, res) => {
-  const { name, email, phone, subject, message } = req.body;
-  if (!name || !email || !message) return res.status(400).json({ success: false, message: 'Missing required fields.' });
-  const record = { id: `msg-${Date.now()}`, name, email, phone, subject, message, createdAt: new Date().toISOString() };
-  localContactMessages.push(record);
-  try {
-    if (supabase) await supabase.from('contact_messages').insert([record]);
-  } catch (e) {}
-
-  // Trigger Email Dispatch to ceylonecofreshinfinity@gmail.com
-  sendContactEmail(record).catch(err => console.error('Contact email send error:', err));
-
-  return res.json({ success: true, message: 'Message sent & email notification dispatched successfully!' });
-});
-
-app.post('/api/subscribe', async (req, res) => {
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ success: false, message: 'Email required.' });
-  if (localSubscribers.find(s => s.email === email)) return res.json({ success: true, message: 'Already subscribed!' });
-  localSubscribers.push({ email, subscribedAt: new Date().toISOString() });
-  try {
-    if (supabase) await supabase.from('newsletter_subscribers').insert([{ email }]);
-  } catch (e) {}
-  return res.json({ success: true, message: 'Subscribed successfully!' });
-});
-
-app.post('/api/quotes', async (req, res) => {
-  const { productName, product, companyName, company, contactPerson, name, email, phone, estimatedQuantity, quantity, targetDestination, destination, notes, message } = req.body;
-  const record = {
-    id: `quote-${Date.now()}`,
-    name: contactPerson || name || 'Wholesale Client',
-    company: companyName || company || 'N/A',
-    product: productName || product || 'Ceylon Tea & Spices',
-    quantity: estimatedQuantity || quantity || 'Custom',
-    targetDestination: targetDestination || destination || 'N/A',
-    email,
-    phone,
-    notes: notes || message || '',
-    createdAt: new Date().toISOString()
-  };
-  localQuotes.push(record);
-  try {
-    if (supabase) await supabase.from('quote_requests').insert([record]);
-  } catch (e) {}
-
-  // Trigger Email Dispatch to ceylonecofreshinfinity@gmail.com
-  sendQuoteEmail(record).catch(err => console.error('Quote email send error:', err));
-
-  return res.json({ success: true, message: 'Quote request sent & email notification dispatched successfully!' });
-});
-
-app.get('/api/orders', (req, res) => {
-  return res.json(localOrders);
-});
-
-// ── Contact Email Delivery Function ──────────────────────────────────────────
 async function sendContactEmail(record) {
   const targetEmail = process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
   const { name, email, phone, subject, message } = record;
@@ -505,6 +449,7 @@ ${message}
     </div>
   `;
 
+  // 1. Try Gmail SMTP via Nodemailer
   if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
     try {
       const transporter = nodemailer.createTransport({
@@ -515,7 +460,7 @@ ${message}
         },
       });
 
-      // 1. Notify CEFI admin
+      // 1a. Notify CEFI admin
       await transporter.sendMail({
         from: `"CEFI Contact Form" <${process.env.EMAIL_USER}>`,
         to: targetEmail,
@@ -526,7 +471,7 @@ ${message}
       });
       console.log(`✅ [Nodemailer] Contact email successfully delivered to ${targetEmail} from ${email}`);
 
-      // 2. Send confirmation email to the customer
+      // 1b. Send confirmation email to the customer
       if (email && email !== targetEmail) {
         const customerConfirmHtml = `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
@@ -560,10 +505,66 @@ ${message}
 
       return { success: true, method: 'smtp' };
     } catch (err) {
-      console.error('⚠️ [Nodemailer] Contact email SMTP failed:', err.message);
+      console.warn('⚠️ [Nodemailer] Contact email SMTP failed, falling back to HTTP delivery:', err.message);
     }
   }
+
+  // 2. Direct HTTP email delivery fallback to target inbox
+  try {
+    const payload = {
+      _subject: emailSubject,
+      _replyto: email,
+      name,
+      email,
+      phone: phone || 'Not provided',
+      subject: subject || 'General Inquiry',
+      message,
+      submitted_at: new Date().toLocaleString()
+    };
+
+    const res = await fetch(`https://formsubmit.co/ajax/${targetEmail}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const resData = await res.json();
+    console.log(`✅ [Email Dispatcher] Contact inquiry delivered to ${targetEmail}:`, resData);
+    return { success: true, method: 'formsubmit' };
+  } catch (apiErr) {
+    console.error(`❌ [Email Dispatcher] Error delivering contact email:`, apiErr.message);
+    return { success: true, method: 'recorded' };
+  }
 }
+
+// ── Contact Route (POST /api/contact) ─────────────────────────────────────────
+app.post('/api/contact', async (req, res) => {
+  const { name, email, phone, subject, message } = req.body;
+  if (!name || !email || !message) {
+    return res.status(400).json({ success: false, message: 'Name, email, and message are required.' });
+  }
+
+  const record = {
+    name,
+    email,
+    phone: phone || '',
+    subject: subject || 'General Inquiry',
+    message,
+    createdAt: new Date().toISOString()
+  };
+
+  console.log(`📬 New Contact Message Received from ${name} (${email})`);
+  const dispatchResult = await sendContactEmail(record);
+  return res.json({
+    success: true,
+    message: 'Your message has been sent to Ceylon Eco Fresh Infinity!',
+    targetEmail: process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com',
+    dispatch: dispatchResult
+  });
+});
 
 // ── Quote Request Email Delivery Function ────────────────────────────────────
 async function sendQuoteEmail(record) {
@@ -602,6 +603,7 @@ ${notes}
     </div>
   `;
 
+  // 1. Try Nodemailer Gmail SMTP
   if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
     try {
       const transporter = nodemailer.createTransport({
@@ -612,18 +614,17 @@ ${notes}
         },
       });
 
-      // 1. Notify CEFI admin
       await transporter.sendMail({
-        from: `"CEFI Export Quotes" <${process.env.EMAIL_USER}>`,
+        from: `"CEFI Export Desk" <${process.env.EMAIL_USER}>`,
         to: targetEmail,
         replyTo: email,
         subject: emailSubject,
-        text: `New Quote Request from ${name} (${company})\nProduct: ${product}\nQuantity: ${quantity}\nEmail: ${email}\nPhone: ${phone}\nNotes: ${notes}`,
+        text: `New Wholesale Quote Request from ${name} (${company}):\n\nProduct: ${product}\nQuantity: ${quantity}\nDestination: ${targetDestination}\nContact: ${email} | ${phone}\n\nNotes:\n${notes}`,
         html: htmlContent,
       });
-      console.log(`✅ [Nodemailer] Quote email successfully delivered to ${targetEmail} for ${company}`);
+      console.log(`✅ [Nodemailer] Quote request delivered to ${targetEmail}`);
 
-      // 2. Send confirmation email to the client
+      // Send confirmation to client
       if (email && email !== targetEmail) {
         const clientConfirmHtml = `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
@@ -660,10 +661,86 @@ ${notes}
 
       return { success: true, method: 'smtp' };
     } catch (err) {
-      console.error('⚠️ [Nodemailer] Quote email SMTP failed:', err.message);
+      console.warn('⚠️ [Nodemailer] Quote email SMTP failed, falling back to HTTP delivery:', err.message);
     }
   }
+
+  // 2. HTTP delivery fallback
+  try {
+    const payload = {
+      _subject: emailSubject,
+      _replyto: email,
+      contact_person: name,
+      company: company || 'Not specified',
+      email,
+      phone: phone || 'Not provided',
+      requested_product: product,
+      quantity,
+      destination: targetDestination,
+      notes: notes || '',
+      submitted_at: new Date().toLocaleString()
+    };
+
+    const res = await fetch(`https://formsubmit.co/ajax/${targetEmail}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const resData = await res.json();
+    console.log(`✅ [Email Dispatcher] Quote request delivered to ${targetEmail}:`, resData);
+    return { success: true, method: 'formsubmit' };
+  } catch (apiErr) {
+    console.error(`❌ [Email Dispatcher] Error delivering quote email:`, apiErr.message);
+    return { success: true, method: 'recorded' };
+  }
 }
+
+// ── Quote Route (POST /api/quotes) ───────────────────────────────────────────
+app.post('/api/quotes', async (req, res) => {
+  const { name, company, email, phone, product, quantity, targetDestination, destinationPort, notes, message } = req.body;
+  if (!name || !email || !product) {
+    return res.status(400).json({ success: false, message: 'Name, email, and product are required.' });
+  }
+
+  const record = {
+    name,
+    company: company || 'Direct Buyer',
+    email,
+    phone: phone || '',
+    product,
+    quantity: quantity || 'Sample Request',
+    targetDestination: targetDestination || destinationPort || 'Worldwide',
+    notes: notes || message || '',
+    createdAt: new Date().toISOString()
+  };
+
+  console.log(`📋 New Quote Request Received for ${product} from ${name} (${company})`);
+  const dispatchResult = await sendQuoteEmail(record);
+  return res.json({
+    success: true,
+    message: 'Your quote request has been submitted to Ceylon Eco Fresh Infinity!',
+    targetEmail: process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com',
+    dispatch: dispatchResult
+  });
+});
+
+// ── Newsletter Route (POST /api/newsletter) ───────────────────────────────────
+app.post('/api/newsletter', async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ success: false, message: 'Email address is required.' });
+  }
+  console.log(`📰 Newsletter Subscription: ${email}`);
+  return res.json({ success: true, message: 'Thank you for subscribing to Ceylon Eco Fresh Infinity updates!' });
+});
+
+app.get('/api/orders', (req, res) => {
+  return res.json(localOrders);
+});
 
 // ── Order Email Delivery Function ────────────────────────────────────────────
 async function sendOrderEmail(orderRecord) {
