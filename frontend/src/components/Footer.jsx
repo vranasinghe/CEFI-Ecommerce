@@ -171,7 +171,14 @@ export default function Footer() {
           <div className="space-y-2.5 text-xs text-emerald-200/80">
             <div className="flex items-start space-x-2.5">
               <MapPin className="w-4 h-4 text-cefi-gold shrink-0 mt-0.5" />
-              <span>No. 278/1/A, Meegasmulla. Dedigamuwa.</span>
+              <a
+                href="https://maps.google.com/?q=No.+278/1/A,+Meegasmulla,+Dedigamuwa,+Sri+Lanka"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-white hover:underline transition-colors"
+              >
+                No. 278/1/A, Meegasmulla, Dedigamuwa, Sri Lanka.
+              </a>
             </div>
             <div className="flex items-center space-x-2.5">
               <Phone className="w-4 h-4 text-cefi-gold shrink-0" />

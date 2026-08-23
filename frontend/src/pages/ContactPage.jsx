@@ -144,13 +144,32 @@ export default function ContactPage() {
           </div>
 
           {/* Embedded Map Container */}
-          <div className="bg-white p-2 rounded-3xl border border-gray-100 shadow-soft overflow-hidden h-64">
-            <iframe
-              title="CEFI Location Map"
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3960.982352824335!2d79.865324!3d6.892693!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3ae25a4a58925555%3A0x6b772dfd38a0f0!2sHavelock%20Rd%2C%20Colombo!5e0!3m2!1sen!2slk!4v1700000000000!5m2!1sen!2slk"
-              className="w-full h-full rounded-2xl border-0"
-              loading="lazy"
-            ></iframe>
+          <div className="bg-white p-3 rounded-3xl border border-gray-100 shadow-soft overflow-hidden space-y-2">
+            <div className="flex items-center justify-between px-2 pt-1">
+              <div className="flex items-center space-x-1.5 text-xs font-bold text-cefi-earth">
+                <MapPin className="w-3.5 h-3.5 text-cefi-green" />
+                <span>Meegasmulla, Dedigamuwa, Sri Lanka</span>
+              </div>
+              <a
+                href="https://maps.google.com/?q=No.+278/1/A,+Meegasmulla,+Dedigamuwa,+Sri+Lanka"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] font-semibold text-cefi-green hover:text-cefi-green-dark hover:underline inline-flex items-center space-x-1"
+              >
+                <span>Open in Maps</span>
+                <span className="text-[10px]">↗</span>
+              </a>
+            </div>
+            <div className="h-64 rounded-2xl overflow-hidden border border-gray-100 relative">
+              <iframe
+                title="CEFI Headquarters - No. 278/1/A, Meegasmulla, Dedigamuwa"
+                src="https://maps.google.com/maps?q=No.+278/1/A,+Meegasmulla,+Dedigamuwa,+Sri+Lanka&t=&z=15&ie=UTF8&iwloc=&output=embed"
+                className="w-full h-full border-0"
+                allowFullScreen=""
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              ></iframe>
+            </div>
           </div>
 
         </div>
