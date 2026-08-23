@@ -3,17 +3,9 @@ import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 
 export default function CategoryCard({ category }) {
-  // Extract initial letter for background watermark style
-  const initial = category.name ? category.name.charAt(0).toUpperCase() : 'C';
-
   return (
     <div className="group relative bg-white p-6 border-2 border-gray-100 shadow-sm hover:border-cefi-earth hover:shadow-md transition-all duration-300 flex flex-col items-center text-center overflow-hidden">
       
-      {/* Background Watermark Initial */}
-      <div className="absolute top-12 left-6 select-none pointer-events-none text-[10rem] leading-none font-serif font-black text-gray-200/70 group-hover:text-cefi-earth transition-colors duration-300 z-0">
-        {initial}
-      </div>
-
       {/* Category Image - true transparent PNG, no blend mode needed */}
       <div className="relative z-10 w-44 h-44 mb-6 transform group-hover:scale-105 transition-transform duration-500 flex items-center justify-center">
         <img
