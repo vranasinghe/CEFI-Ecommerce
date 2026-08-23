@@ -388,17 +388,41 @@ app.post('/api/upload', (req, res) => {
   });
 });
 
-// ── Blog ─────────────────────────────────────────────────────────────────────
+const blogsFilePath = path.join(__dirname, 'blogs.json');
+
+function getStoredBlogs() {
+  try {
+    if (fs.existsSync(blogsFilePath)) {
+      return JSON.parse(fs.readFileSync(blogsFilePath, 'utf8'));
+    }
+  } catch (e) {
+    console.error('Error reading blogs.json:', e);
+  }
+  return mockData.blogPosts || [];
+}
+
+function saveStoredBlogs(blogs) {
+  try {
+    fs.writeFileSync(blogsFilePath, JSON.stringify(blogs, null, 2), 'utf8');
+  } catch (e) {
+    console.error('Error writing blogs.json:', e);
+  }
+}
+
+// ── Blog: GET all ─────────────────────────────────────────────────────────────
 app.get('/api/blog', async (req, res) => {
   try {
     if (supabase) {
       const { data, error } = await supabase.from('blog_posts').select('*').order('published_at', { ascending: false });
       if (!error && data && data.length > 0) return res.json(data);
     }
-    return res.json(mockData.blogPosts);
-  } catch (err) { res.json(mockData.blogPosts); }
+    return res.json(getStoredBlogs());
+  } catch {
+    return res.json(getStoredBlogs());
+  }
 });
 
+// ── Blog: GET one by slug or id ───────────────────────────────────────────────
 app.get('/api/blog/:slug', async (req, res) => {
   const { slug } = req.params;
   try {
@@ -406,14 +430,117 @@ app.get('/api/blog/:slug', async (req, res) => {
       const { data, error } = await supabase.from('blog_posts').select('*').eq('slug', slug).single();
       if (!error && data) return res.json(data);
     }
-    const post = mockData.blogPosts.find(b => b.slug === slug);
+    const blogs = getStoredBlogs();
+    const post = blogs.find(b => b.slug === slug || b.id === slug);
     if (post) return res.json(post);
     return res.status(404).json({ message: 'Post not found' });
-  } catch (err) {
-    const post = mockData.blogPosts.find(b => b.slug === slug);
+  } catch {
+    const blogs = getStoredBlogs();
+    const post = blogs.find(b => b.slug === slug || b.id === slug);
     if (post) return res.json(post);
     return res.status(404).json({ message: 'Post not found' });
   }
+});
+
+// ── Blog: POST (Create New Article) ──────────────────────────────────────────
+app.post('/api/blog', async (req, res) => {
+  const { title, slug, cover_image, excerpt, content, author, category, read_time_min } = req.body;
+  if (!title || !content) {
+    return res.status(400).json({ success: false, message: 'Title and content are required.' });
+  }
+
+  const generatedSlug = (slug || title)
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+
+  const newPost = {
+    id: `blog-${Date.now()}`,
+    title,
+    slug: generatedSlug,
+    category: category || 'Trade & Insights',
+    cover_image: cover_image || 'https://images.unsplash.com/photo-1597481499750-3e6b22637e12?auto=format&fit=crop&w=800&q=80',
+    excerpt: excerpt || (content.length > 160 ? content.substring(0, 160) + '...' : content),
+    content,
+    author: author || 'CEFI Editorial Team',
+    read_time_min: parseInt(read_time_min, 10) || 5,
+    published_at: new Date().toISOString()
+  };
+
+  try {
+    if (supabase) {
+      await supabase.from('blog_posts').insert([newPost]);
+    }
+  } catch (e) {
+    console.warn('Supabase blog insert fallback:', e.message);
+  }
+
+  const currentBlogs = getStoredBlogs();
+  currentBlogs.unshift(newPost);
+  saveStoredBlogs(currentBlogs);
+
+  console.log(`📝 New Blog Post Created: "${newPost.title}"`);
+  return res.json({ success: true, message: 'Blog article published successfully!', post: newPost });
+});
+
+// ── Blog: PUT (Update Article) ────────────────────────────────────────────────
+app.put('/api/blog/:id', async (req, res) => {
+  const { id } = req.params;
+  const { title, slug, cover_image, excerpt, content, author, category, read_time_min } = req.body;
+
+  const currentBlogs = getStoredBlogs();
+  const index = currentBlogs.findIndex(b => b.id === id || b.slug === id);
+  if (index === -1) {
+    return res.status(404).json({ success: false, message: 'Article not found.' });
+  }
+
+  const updatedPost = {
+    ...currentBlogs[index],
+    title: title !== undefined ? title : currentBlogs[index].title,
+    slug: slug !== undefined ? slug : currentBlogs[index].slug,
+    category: category !== undefined ? category : currentBlogs[index].category,
+    cover_image: cover_image !== undefined ? cover_image : currentBlogs[index].cover_image,
+    excerpt: excerpt !== undefined ? excerpt : currentBlogs[index].excerpt,
+    content: content !== undefined ? content : currentBlogs[index].content,
+    author: author !== undefined ? author : currentBlogs[index].author,
+    read_time_min: read_time_min !== undefined ? (parseInt(read_time_min, 10) || 5) : currentBlogs[index].read_time_min,
+    updated_at: new Date().toISOString()
+  };
+
+  try {
+    if (supabase) {
+      await supabase.from('blog_posts').update(updatedPost).eq('id', id);
+    }
+  } catch (e) {
+    console.warn('Supabase blog update fallback:', e.message);
+  }
+
+  currentBlogs[index] = updatedPost;
+  saveStoredBlogs(currentBlogs);
+
+  console.log(`📝 Blog Post Updated: "${updatedPost.title}"`);
+  return res.json({ success: true, message: 'Blog article updated successfully!', post: updatedPost });
+});
+
+// ── Blog: DELETE Article ──────────────────────────────────────────────────────
+app.delete('/api/blog/:id', async (req, res) => {
+  const { id } = req.params;
+  const currentBlogs = getStoredBlogs();
+  const filtered = currentBlogs.filter(b => b.id !== id && b.slug !== id);
+
+  try {
+    if (supabase) {
+      await supabase.from('blog_posts').delete().eq('id', id);
+    }
+  } catch (e) {
+    console.warn('Supabase blog delete fallback:', e.message);
+  }
+
+  saveStoredBlogs(filtered);
+  console.log(`🗑️ Blog Post Deleted: ${id}`);
+  return res.json({ success: true, message: 'Blog article deleted successfully!' });
 });
 
 // ── Contact / Quotes / Orders ─────────────────────────────────────────────────
