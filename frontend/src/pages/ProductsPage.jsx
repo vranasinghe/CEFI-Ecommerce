@@ -9,6 +9,7 @@ export default function ProductsPage({ onOpenQuoteModal }) {
 
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [catalogProfile, setCatalogProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const selectedCategory = categoryParam || searchParams.get('category') || 'all';
@@ -31,6 +32,12 @@ export default function ProductsPage({ onOpenQuoteModal }) {
         });
         setCategories([...sortedData]);
       })
+      .catch(() => {});
+
+    // Fetch catalog profile
+    fetch('/api/catalog-profile')
+      .then(res => res.json())
+      .then(data => setCatalogProfile(data))
       .catch(() => {});
   }, []);
 
@@ -60,18 +67,44 @@ export default function ProductsPage({ onOpenQuoteModal }) {
     }
   };
 
+  // Determine current active banner details
+  const activeProfile = (() => {
+    if (selectedCategory === 'all' || !catalogProfile) {
+      return {
+        badge: catalogProfile?.all?.badge || 'Catalog Portfolio',
+        title: catalogProfile?.all?.title || 'All Ceylon Products',
+        description: catalogProfile?.all?.description || 'Explore 100% natural Ceylon teas, true cinnamon, spices, dried tropical fruits, and herbs harvested directly from Sri Lankan estates.'
+      };
+    }
+    const catProfile = catalogProfile?.categories?.[selectedCategory];
+    const catInfo = categories.find(c => c.slug === selectedCategory);
+    return {
+      badge: catProfile?.badge || catalogProfile?.all?.badge || 'Catalog Portfolio',
+      title: catProfile?.title || (catInfo ? `${catInfo.name} Collection` : `${selectedCategory} Collection`),
+      description: catProfile?.description || catInfo?.description || catalogProfile?.all?.description || 'Authentic single-origin Ceylon produce exported worldwide.'
+    };
+  })();
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16 py-8 space-y-8">
       
       {/* Header Banner */}
-      <div className="bg-cefi-green rounded-3xl p-8 text-white relative overflow-hidden shadow-lg">
-        <div className="relative z-10 max-w-2xl space-y-2">
-          <span className="text-xs uppercase font-bold tracking-widest text-cefi-gold">Catalog Portfolio</span>
-          <h1 className="font-serif font-bold text-3xl sm:text-4xl capitalize">
-            {selectedCategory === 'all' ? 'All Ceylon Products' : `${selectedCategory} Collection`}
+      <div className="bg-cefi-green rounded-3xl p-8 sm:p-10 text-white relative overflow-hidden shadow-lg border border-emerald-800">
+        {/* Subtle background glow & leaf watermark */}
+        <div className="absolute top-0 right-0 w-80 h-80 bg-cefi-gold/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute -bottom-10 right-10 w-48 h-48 opacity-10 pointer-events-none select-none">
+          <img src="/logo.png" alt="" className="w-full h-full object-contain brightness-0 invert" />
+        </div>
+
+        <div className="relative z-10 max-w-3xl space-y-2.5">
+          <span className="text-xs uppercase font-bold tracking-widest text-cefi-gold inline-block">
+            {activeProfile.badge}
+          </span>
+          <h1 className="font-serif font-bold text-3xl sm:text-4xl lg:text-[42px] leading-tight">
+            {activeProfile.title}
           </h1>
-          <p className="text-xs sm:text-sm text-emerald-100/90 font-sans">
-            Explore 100% natural Ceylon teas, true cinnamon, spices, dried tropical fruits, and herbs harvested directly from Sri Lankan estates.
+          <p className="text-xs sm:text-sm lg:text-base text-emerald-100/90 font-sans leading-relaxed">
+            {activeProfile.description}
           </p>
         </div>
       </div>

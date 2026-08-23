@@ -3,23 +3,65 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   Users, ShoppingBag, Package, Plus, Pencil, Trash2, Search, RefreshCw,
   Eye, AlertTriangle, LayoutGrid, ShieldCheck, LogOut, CheckCircle2,
-  Clock, Globe, Filter, ExternalLink
+  Clock, Globe, Filter, ExternalLink, Sliders, Sparkles, Save, RotateCcw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const CATEGORY_ICONS = {
-  tea:        '🍵',
-  herbal:     '🌿',
-  spices:     '🌶️',
-  fruits:     '🍋',
-  vegetables: '🥦',
+  'herbal-leaves':  '🌿',
+  'herbal-flowers': '🌸',
+  tea:              '🍵',
+  herbal:           '🌿',
+  spices:           '🌶️',
+  fruits:           '🍋',
+  vegetables:       '🥦',
+};
+
+const DEFAULT_CATALOG_PROFILE = {
+  all: {
+    badge: 'Catalog Portfolio',
+    title: 'All Ceylon Products',
+    description: 'Explore 100% natural Ceylon teas, true cinnamon, spices, dried tropical fruits, and herbs harvested directly from Sri Lankan estates.'
+  },
+  categories: {
+    'herbal-leaves': {
+      badge: 'Herbal Wellness',
+      title: 'Herbal Leaves Collection',
+      description: 'Pure Ceylon therapeutic leaves and traditional Ayurvedic botanicals nurtured by the island\'s pristine soil.'
+    },
+    'herbal-flowers': {
+      badge: 'Artisan Botanicals',
+      title: 'Herbal Flowers Collection',
+      description: 'Solar-dried therapeutic Ceylon flowers including Blue Lotus and Butterfly Pea for exquisite herbal infusions.'
+    },
+    tea: {
+      badge: 'Highland Single-Origin',
+      title: 'Pure Ceylon Tea Collection',
+      description: 'World-renowned Ceylon black, green, and silver needle teas hand-picked from mist-covered mountain elevations.'
+    },
+    spices: {
+      badge: 'Authentic Ceylon Spices',
+      title: 'True Spices & Cinnamon Collection',
+      description: 'Finest Ceylon Alba cinnamon, high-piperine black pepper, pungent cloves, and sun-cured spices.'
+    },
+    fruits: {
+      badge: 'Solar Dehydrated',
+      title: 'Tropical Dried Fruits Collection',
+      description: 'Naturally sweet, sulfur-free dehydrated mango, pineapple, papaya, and exotic Ceylon orchard produce.'
+    },
+    vegetables: {
+      badge: 'Farmstead Produce',
+      title: 'Dehydrated Vegetables & Produce',
+      description: 'Premium dehydrated young green jackfruit, kohila, and seasonal farm vegetables processed under ISO 22000 standards.'
+    }
+  }
 };
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const { user: currentUser, logout } = useAuth();
 
-  // Left Sidebar Tab State: 'users' | 'orders' | 'products'
+  // Left Sidebar Tab State: 'users' | 'orders' | 'products' | 'catalog'
   const [activeTab, setActiveTab] = useState('products');
 
   // Data States
@@ -35,6 +77,11 @@ export default function AdminDashboard() {
     }
   });
   const [loading, setLoading]               = useState(true);
+
+  // Catalog Profile Editor State
+  const [catalogProfile, setCatalogProfile] = useState(DEFAULT_CATALOG_PROFILE);
+  const [savingCatalog, setSavingCatalog]   = useState(false);
+  const [profilePreviewTab, setProfilePreviewTab] = useState('all');
 
   // Products Tab Filters
   const [search, setSearch]                 = useState('');
@@ -59,14 +106,44 @@ export default function AdminDashboard() {
       fetch('/api/products').then(r => r.json()),
       fetch('/api/categories').then(r => r.json()),
       fetch('/api/orders').then(r => r.json()).catch(() => []),
+      fetch('/api/catalog-profile').then(r => r.json()).catch(() => null),
     ])
-      .then(([prods, cats, ords]) => {
+      .then(([prods, cats, ords, catProfile]) => {
         setProducts(Array.isArray(prods) ? prods : []);
         setCategories(Array.isArray(cats) ? cats : []);
         setOrders(Array.isArray(ords) ? ords : []);
+        if (catProfile && catProfile.all) {
+          setCatalogProfile(catProfile);
+        }
         setLoading(false);
       })
       .catch(() => setLoading(false));
+  };
+
+  const handleSaveCatalogProfile = async () => {
+    setSavingCatalog(true);
+    try {
+      const res = await fetch('/api/catalog-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(catalogProfile)
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Catalog profile updated & published to storefront!');
+      } else {
+        showToast('Failed to save catalog profile.', 'error');
+      }
+    } catch {
+      showToast('Network error saving catalog profile.', 'error');
+    } finally {
+      setSavingCatalog(false);
+    }
+  };
+
+  const handleResetCatalogProfile = () => {
+    setCatalogProfile(DEFAULT_CATALOG_PROFILE);
+    showToast('Catalog profile restored to defaults.');
   };
 
   useEffect(() => {
@@ -269,6 +346,24 @@ export default function AdminDashboard() {
                 {products.length}
               </span>
             </button>
+
+            {/* Tab 4: Catalog Profile Banner Editor */}
+            <button
+              onClick={() => setActiveTab('catalog')}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl font-semibold text-xs transition-all ${
+                activeTab === 'catalog'
+                  ? 'bg-cefi-green text-white shadow-md'
+                  : 'hover:bg-slate-800 text-slate-400 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center space-x-3">
+                <Sliders className="w-4 h-4 text-cefi-gold" />
+                <span>4. Catalog Profile</span>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400/20 text-amber-300">
+                Banner
+              </span>
+            </button>
           </nav>
         </div>
 
@@ -312,6 +407,7 @@ export default function AdminDashboard() {
               {activeTab === 'users' && '1. User Account Logins & Profiles'}
               {activeTab === 'orders' && '2. User Orders & Dispatches'}
               {activeTab === 'products' && '3. Current Product Catalog & Editor'}
+              {activeTab === 'catalog' && '4. Catalog Portfolio Profile & Banner Settings'}
             </h1>
           </div>
 
@@ -323,6 +419,26 @@ export default function AdminDashboard() {
               <Plus className="w-4 h-4 text-cefi-gold" />
               <span>Add New Product</span>
             </Link>
+          )}
+
+          {activeTab === 'catalog' && (
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={handleResetCatalogProfile}
+                className="flex items-center space-x-1.5 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl text-xs font-bold transition-all shrink-0"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset Defaults</span>
+              </button>
+              <button
+                onClick={handleSaveCatalogProfile}
+                disabled={savingCatalog}
+                className="flex items-center space-x-2 px-6 py-2.5 bg-cefi-green hover:bg-cefi-green-dark text-white rounded-2xl text-xs font-bold shadow-md transition-all shrink-0 disabled:opacity-50"
+              >
+                {savingCatalog ? <RefreshCw className="w-4 h-4 animate-spin text-cefi-gold" /> : <Save className="w-4 h-4 text-cefi-gold" />}
+                <span>{savingCatalog ? 'Publishing...' : 'Save & Publish Profile'}</span>
+              </button>
+            </div>
           )}
         </div>
 
@@ -626,6 +742,287 @@ export default function AdminDashboard() {
                   </table>
                 </div>
               )}
+            </div>
+
+          </div>
+        )}
+
+        {/* ── TAB 4: CATALOG PROFILE & BANNER EDITOR ─────────────────────── */}
+        {activeTab === 'catalog' && (
+          <div className="space-y-8">
+            
+            {/* Live Storefront Preview Card */}
+            <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                <div className="flex items-center space-x-2">
+                  <Sparkles className="w-4 h-4 text-cefi-gold" />
+                  <h3 className="font-serif font-bold text-base text-cefi-earth">
+                    Storefront Live Preview
+                  </h3>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-2 py-0.5 rounded-full">
+                    Real-time
+                  </span>
+                </div>
+                
+                {/* Category Preview Selector */}
+                <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                  <button
+                    onClick={() => setProfilePreviewTab('all')}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
+                      profilePreviewTab === 'all'
+                        ? 'bg-cefi-green text-white shadow-xs'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    All Products
+                  </button>
+                  {categories.map(cat => (
+                    <button
+                      key={cat.slug}
+                      onClick={() => setProfilePreviewTab(cat.slug)}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
+                        profilePreviewTab === cat.slug
+                          ? 'bg-cefi-green text-white shadow-xs'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Rendered Live Banner */}
+              <div className="bg-cefi-green rounded-3xl p-8 sm:p-10 text-white relative overflow-hidden shadow-lg border border-emerald-800">
+                <div className="absolute top-0 right-0 w-80 h-80 bg-cefi-gold/10 rounded-full blur-3xl pointer-events-none"></div>
+                <div className="absolute -bottom-10 right-10 w-48 h-48 opacity-10 pointer-events-none select-none">
+                  <img src="/logo.png" alt="" className="w-full h-full object-contain brightness-0 invert" />
+                </div>
+
+                <div className="relative z-10 max-w-3xl space-y-2.5">
+                  <span className="text-xs uppercase font-bold tracking-widest text-cefi-gold inline-block">
+                    {profilePreviewTab === 'all'
+                      ? (catalogProfile.all?.badge || 'Catalog Portfolio')
+                      : (catalogProfile.categories?.[profilePreviewTab]?.badge || catalogProfile.all?.badge || 'Catalog Portfolio')}
+                  </span>
+                  <h2 className="font-serif font-bold text-2xl sm:text-3xl lg:text-4xl leading-tight text-white">
+                    {profilePreviewTab === 'all'
+                      ? (catalogProfile.all?.title || 'All Ceylon Products')
+                      : (catalogProfile.categories?.[profilePreviewTab]?.title || `${categories.find(c => c.slug === profilePreviewTab)?.name || profilePreviewTab} Collection`)}
+                  </h2>
+                  <p className="text-xs sm:text-sm text-emerald-100/90 font-sans leading-relaxed">
+                    {profilePreviewTab === 'all'
+                      ? (catalogProfile.all?.description || 'Explore 100% natural Ceylon teas...')
+                      : (catalogProfile.categories?.[profilePreviewTab]?.description || catalogProfile.all?.description || 'Authentic single-origin Ceylon produce.')}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 2-Column Profile Configuration Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+              {/* Box 1: Global Main Catalog Banner */}
+              <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-xs space-y-5">
+                <div className="flex items-center space-x-2.5 border-b border-gray-100 pb-3">
+                  <div className="w-8 h-8 rounded-xl bg-cefi-green/10 flex items-center justify-center text-cefi-green font-bold">
+                    1
+                  </div>
+                  <div>
+                    <h3 className="font-serif font-bold text-base text-cefi-earth">
+                      Main Catalog Portfolio (All Products)
+                    </h3>
+                    <p className="text-xs text-gray-400">Header banner shown on the main /products catalog page</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                      Top Badge / Pill Tag
+                    </label>
+                    <input
+                      type="text"
+                      value={catalogProfile.all?.badge || ''}
+                      onChange={e => setCatalogProfile(prev => ({
+                        ...prev,
+                        all: { ...prev.all, badge: e.target.value }
+                      }))}
+                      placeholder="e.g. Catalog Portfolio"
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-xs text-cefi-earth focus:outline-none focus:border-cefi-green font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                      Main Headline Title
+                    </label>
+                    <input
+                      type="text"
+                      value={catalogProfile.all?.title || ''}
+                      onChange={e => setCatalogProfile(prev => ({
+                        ...prev,
+                        all: { ...prev.all, title: e.target.value }
+                      }))}
+                      placeholder="e.g. All Ceylon Products"
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-xs text-cefi-earth focus:outline-none focus:border-cefi-green font-semibold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                      Catalog Subtitle / Description
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={catalogProfile.all?.description || ''}
+                      onChange={e => setCatalogProfile(prev => ({
+                        ...prev,
+                        all: { ...prev.all, description: e.target.value }
+                      }))}
+                      placeholder="Describe your catalog portfolio offerings..."
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-xs text-cefi-earth focus:outline-none focus:border-cefi-green leading-relaxed"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Box 2: Category Profiles */}
+              <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-xs space-y-5">
+                <div className="flex items-center space-x-2.5 border-b border-gray-100 pb-3">
+                  <div className="w-8 h-8 rounded-xl bg-cefi-green/10 flex items-center justify-center text-cefi-green font-bold">
+                    2
+                  </div>
+                  <div>
+                    <h3 className="font-serif font-bold text-base text-cefi-earth">
+                      Category Profile Customizer
+                    </h3>
+                    <p className="text-xs text-gray-400">Headlines & descriptions when filtering specific categories</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Category Selector */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                      Select Category to Customize
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {categories.map(cat => (
+                        <button
+                          key={cat.slug}
+                          type="button"
+                          onClick={() => setProfilePreviewTab(cat.slug)}
+                          className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 transition-all ${
+                            profilePreviewTab === cat.slug
+                              ? 'bg-cefi-green text-white shadow-sm'
+                              : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-100'
+                          }`}
+                        >
+                          <span>{CATEGORY_ICONS[cat.slug] || '📦'}</span>
+                          <span className="truncate">{cat.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {profilePreviewTab !== 'all' && (
+                    <div className="space-y-3 pt-2 border-t border-gray-100">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                          {categories.find(c => c.slug === profilePreviewTab)?.name || profilePreviewTab} — Tag / Badge
+                        </label>
+                        <input
+                          type="text"
+                          value={catalogProfile.categories?.[profilePreviewTab]?.badge || ''}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setCatalogProfile(prev => ({
+                              ...prev,
+                              categories: {
+                                ...prev.categories,
+                                [profilePreviewTab]: {
+                                  ...(prev.categories?.[profilePreviewTab] || {}),
+                                  badge: val
+                                }
+                              }
+                            }));
+                          }}
+                          placeholder="e.g. Herbal Wellness"
+                          className="w-full px-4 py-2 rounded-xl border border-gray-200 text-xs text-cefi-earth focus:outline-none focus:border-cefi-green"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                          {categories.find(c => c.slug === profilePreviewTab)?.name || profilePreviewTab} — Headline
+                        </label>
+                        <input
+                          type="text"
+                          value={catalogProfile.categories?.[profilePreviewTab]?.title || ''}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setCatalogProfile(prev => ({
+                              ...prev,
+                              categories: {
+                                ...prev.categories,
+                                [profilePreviewTab]: {
+                                  ...(prev.categories?.[profilePreviewTab] || {}),
+                                  title: val
+                                }
+                              }
+                            }));
+                          }}
+                          placeholder="e.g. Pure Ceylon Tea Collection"
+                          className="w-full px-4 py-2 rounded-xl border border-gray-200 text-xs text-cefi-earth focus:outline-none focus:border-cefi-green"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                          {categories.find(c => c.slug === profilePreviewTab)?.name || profilePreviewTab} — Description
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={catalogProfile.categories?.[profilePreviewTab]?.description || ''}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setCatalogProfile(prev => ({
+                              ...prev,
+                              categories: {
+                                ...prev.categories,
+                                [profilePreviewTab]: {
+                                  ...(prev.categories?.[profilePreviewTab] || {}),
+                                  description: val
+                                }
+                              }
+                            }));
+                          }}
+                          placeholder="Category specific harvesting & origin description..."
+                          className="w-full px-4 py-2 rounded-xl border border-gray-200 text-xs text-cefi-earth focus:outline-none focus:border-cefi-green"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Bottom Save Action Bar */}
+            <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-xs flex items-center justify-between">
+              <div className="flex items-center space-x-2 text-xs text-gray-500">
+                <CheckCircle2 className="w-4 h-4 text-cefi-green" />
+                <span>All changes will immediately reflect on the public product storefront upon saving.</span>
+              </div>
+              <button
+                onClick={handleSaveCatalogProfile}
+                disabled={savingCatalog}
+                className="flex items-center space-x-2 px-6 py-2.5 bg-cefi-green hover:bg-cefi-green-dark text-white rounded-xl text-xs font-bold shadow-md transition-all shrink-0 disabled:opacity-50"
+              >
+                {savingCatalog ? <RefreshCw className="w-4 h-4 animate-spin text-cefi-gold" /> : <Save className="w-4 h-4 text-cefi-gold" />}
+                <span>{savingCatalog ? 'Saving...' : 'Save & Publish Profile'}</span>
+              </button>
             </div>
 
           </div>

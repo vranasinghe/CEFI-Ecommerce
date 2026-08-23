@@ -61,7 +61,7 @@ export default function Header({ onOpenQuoteModal }) {
           ? 'bg-white/95 backdrop-blur-md shadow-md py-1 border-b border-gray-100' 
           : 'bg-cefi-cream/90 backdrop-blur-sm py-2 border-b border-cefi-cream-dark'
       }`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16 flex items-center justify-between">
           
           {/* Brand Logo */}
           <Link to="/" className="flex items-center space-x-1.5 sm:space-x-3 group">

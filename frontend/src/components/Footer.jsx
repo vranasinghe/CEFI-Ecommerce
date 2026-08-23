@@ -27,7 +27,7 @@ export default function Footer() {
     <footer className="bg-cefi-green-dark text-emerald-100 pt-16 pb-8 border-t border-emerald-900">
       
       {/* Top Value Proposition Badges */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 mb-12 border-b border-emerald-800/60">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16 pb-12 mb-12 border-b border-emerald-800/60">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center md:text-left">
           <div className="flex items-center space-x-4">
             <div className="p-3 bg-cefi-gold/20 rounded-2xl shrink-0">
@@ -62,7 +62,7 @@ export default function Footer() {
       </div>
 
       {/* Main 4-Column Footer Grid */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
         
         {/* Column 1: Brand & Tagline */}
         <div className="space-y-4">
@@ -217,7 +217,7 @@ export default function Footer() {
       </div>
 
       {/* Bottom Bar */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 pt-6 border-t border-emerald-900 flex flex-col md:flex-row items-center justify-between text-xs text-emerald-300/60 space-y-4 md:space-y-0">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16 mt-12 pt-6 border-t border-emerald-900 flex flex-col md:flex-row items-center justify-between text-xs text-emerald-300/60 space-y-4 md:space-y-0">
         <div>
           © {new Date().getFullYear()} Ceylon Eco Fresh Infinity (Pvt) Ltd. All rights reserved.
         </div>

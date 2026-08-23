@@ -93,6 +93,83 @@ app.get('/api/categories/:slug', async (req, res) => {
   }
 });
 
+// ── Catalog Profile (Portfolio Header & Category Descriptions) ────────────────
+const catalogProfilePath = path.join(__dirname, 'catalogProfile.json');
+
+const defaultCatalogProfile = {
+  all: {
+    badge: 'Catalog Portfolio',
+    title: 'All Ceylon Products',
+    description: 'Explore 100% natural Ceylon teas, true cinnamon, spices, dried tropical fruits, and herbs harvested directly from Sri Lankan estates.'
+  },
+  categories: {
+    'herbal-leaves': {
+      badge: 'Herbal Wellness',
+      title: 'Herbal Leaves Collection',
+      description: 'Pure Ceylon therapeutic leaves and traditional Ayurvedic botanicals nurtured by the island\'s pristine soil.'
+    },
+    'herbal-flowers': {
+      badge: 'Artisan Botanicals',
+      title: 'Herbal Flowers Collection',
+      description: 'Solar-dried therapeutic Ceylon flowers including Blue Lotus and Butterfly Pea for exquisite herbal infusions.'
+    },
+    tea: {
+      badge: 'Highland Single-Origin',
+      title: 'Pure Ceylon Tea Collection',
+      description: 'World-renowned Ceylon black, green, and silver needle teas hand-picked from mist-covered mountain elevations.'
+    },
+    spices: {
+      badge: 'Authentic Ceylon Spices',
+      title: 'True Spices & Cinnamon Collection',
+      description: 'Finest Ceylon Alba cinnamon, high-piperine black pepper, pungent cloves, and sun-cured spices.'
+    },
+    fruits: {
+      badge: 'Solar Dehydrated',
+      title: 'Tropical Dried Fruits Collection',
+      description: 'Naturally sweet, sulfur-free dehydrated mango, pineapple, papaya, and exotic Ceylon orchard produce.'
+    },
+    vegetables: {
+      badge: 'Farmstead Produce',
+      title: 'Dehydrated Vegetables & Produce',
+      description: 'Premium dehydrated young green jackfruit, kohila, and seasonal farm vegetables processed under ISO 22000 standards.'
+    }
+  }
+};
+
+app.get('/api/catalog-profile', (req, res) => {
+  try {
+    if (fs.existsSync(catalogProfilePath)) {
+      const data = JSON.parse(fs.readFileSync(catalogProfilePath, 'utf8'));
+      return res.json(data);
+    }
+  } catch (e) {
+    console.error('Error reading catalogProfile.json:', e);
+  }
+  return res.json(defaultCatalogProfile);
+});
+
+app.post('/api/catalog-profile', (req, res) => {
+  try {
+    const updated = req.body;
+    fs.writeFileSync(catalogProfilePath, JSON.stringify(updated, null, 2), 'utf8');
+    return res.json({ success: true, message: 'Catalog profile updated successfully', data: updated });
+  } catch (e) {
+    console.error('Error saving catalogProfile.json:', e);
+    return res.status(500).json({ success: false, error: 'Failed to update catalog profile' });
+  }
+});
+
+app.put('/api/catalog-profile', (req, res) => {
+  try {
+    const updated = req.body;
+    fs.writeFileSync(catalogProfilePath, JSON.stringify(updated, null, 2), 'utf8');
+    return res.json({ success: true, message: 'Catalog profile updated successfully', data: updated });
+  } catch (e) {
+    console.error('Error saving catalogProfile.json:', e);
+    return res.status(500).json({ success: false, error: 'Failed to update catalog profile' });
+  }
+});
+
 // ── Products: GET all ─────────────────────────────────────────────────────────
 app.get('/api/products', async (req, res) => {
   const { category, search, sort, featured, wholesale } = req.query;
