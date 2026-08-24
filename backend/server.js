@@ -5,6 +5,68 @@ const fs = require('fs');
 const nodemailer = require('nodemailer');
 require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
 
+// ── Persistent SSL SMTP Transporter Pool ─────────────────────────────────────
+let mailTransporter = null;
+if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+  mailTransporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+    pool: true,
+    maxConnections: 5,
+    maxMessages: 100,
+    connectionTimeout: 10000,
+    greetingTimeout: 5000,
+    socketTimeout: 15000
+  });
+
+  mailTransporter.verify((err) => {
+    if (err) {
+      console.warn('⚠️ SMTP Transporter verification warning:', err.message);
+    } else {
+      console.log('✅ Email SMTP service initialized & ready (smtp.gmail.com:465).');
+    }
+  });
+}
+
+// Helper to send admin and customer emails concurrently
+async function sendDualEmails(adminOptions, customerOptions) {
+  if (!mailTransporter) return { success: false, error: 'No email credentials configured' };
+
+  const promises = [mailTransporter.sendMail(adminOptions)];
+  if (customerOptions && customerOptions.to && customerOptions.to !== adminOptions.to) {
+    promises.push(mailTransporter.sendMail(customerOptions));
+  }
+
+  const results = await Promise.allSettled(promises);
+  const adminResult = results[0];
+  const customerResult = results[1];
+
+  if (adminResult.status === 'fulfilled') {
+    console.log(`✅ [Nodemailer] Admin notification sent to ${adminOptions.to} (${adminResult.value.messageId})`);
+  } else {
+    console.error(`❌ [Nodemailer] Failed to send admin email:`, adminResult.reason?.message || adminResult.reason);
+  }
+
+  if (customerResult) {
+    if (customerResult.status === 'fulfilled') {
+      console.log(`✅ [Nodemailer] Customer confirmation sent to ${customerOptions.to} (${customerResult.value.messageId})`);
+    } else {
+      console.warn(`⚠️ [Nodemailer] Customer confirmation failed (e.g. invalid recipient):`, customerResult.reason?.message || customerResult.reason);
+    }
+  }
+
+  return {
+    success: adminResult.status === 'fulfilled',
+    adminSent: adminResult.status === 'fulfilled',
+    customerSent: customerResult ? customerResult.status === 'fulfilled' : true
+  };
+}
+
 // Try to load multer (for file uploads)
 let multer;
 try {
@@ -576,31 +638,24 @@ ${message}
     </div>
   `;
 
-  // 1. Try Gmail SMTP via Nodemailer
-  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+  // 1. Send via Persistent SMTP
+  if (mailTransporter) {
     try {
-      const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS,
-        },
-      });
-
-      // 1a. Notify CEFI admin
-      await transporter.sendMail({
+      const adminOptions = {
         from: `"CEFI Contact Form" <${process.env.EMAIL_USER}>`,
         to: targetEmail,
         replyTo: email,
         subject: emailSubject,
         text: `New Contact Form Message from ${name} (${email}, ${phone || 'No phone'})\n\nSubject: ${subject}\n\nMessage:\n${message}`,
         html: htmlContent,
-      });
-      console.log(`✅ [Nodemailer] Contact email successfully delivered to ${targetEmail} from ${email}`);
+      };
 
-      // 1b. Send confirmation email to the customer
-      if (email && email !== targetEmail) {
-        const customerConfirmHtml = `
+      const customerOptions = (email && email !== targetEmail) ? {
+        from: `"Ceylon Eco Fresh Infinity" <${process.env.EMAIL_USER}>`,
+        to: email,
+        subject: `✅ We received your message, ${name.split(' ')[0]}! — CEFI`,
+        text: `Dear ${name},\n\nThank you for contacting Ceylon Eco Fresh Infinity. We have received your message regarding "${subject}" and our team will respond within 24 hours.\n\nFor urgent matters, contact us at +94 714 634 485.\n\nBest regards,\nCeylon Eco Fresh Infinity Team`,
+        html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
             <div style="background-color: #1F532E; color: #ffffff; padding: 24px; text-align: center;">
               <h2 style="margin: 0; color: #D4AF37; font-size: 22px;">Ceylon Eco Fresh Infinity (Pvt) Ltd</h2>
@@ -619,20 +674,13 @@ ${message}
               Ceylon Eco Fresh Infinity (Pvt) Ltd · No. 278/1/A, Meegasmulla, Dedigamuwa · ceylonecofreshinfinity@gmail.com
             </div>
           </div>
-        `;
-        await transporter.sendMail({
-          from: `"Ceylon Eco Fresh Infinity" <${process.env.EMAIL_USER}>`,
-          to: email,
-          subject: `✅ We received your message, ${name.split(' ')[0]}! — CEFI`,
-          text: `Dear ${name},\n\nThank you for contacting Ceylon Eco Fresh Infinity. We have received your message regarding "${subject}" and our team will respond within 24 hours.\n\nFor urgent matters, contact us at +94 714 634 485.\n\nBest regards,\nCeylon Eco Fresh Infinity Team`,
-          html: customerConfirmHtml,
-        });
-        console.log(`✅ [Nodemailer] Contact confirmation sent to customer: ${email}`);
-      }
+        `
+      } : null;
 
-      return { success: true, method: 'smtp' };
+      const result = await sendDualEmails(adminOptions, customerOptions);
+      if (result.success) return { success: true, method: 'smtp' };
     } catch (err) {
-      console.warn('⚠️ [Nodemailer] Contact email SMTP failed, falling back to HTTP delivery:', err.message);
+      console.warn('⚠️ [Nodemailer] Contact email failed:', err.message);
     }
   }
 
@@ -730,30 +778,24 @@ ${notes}
     </div>
   `;
 
-  // 1. Try Nodemailer Gmail SMTP
-  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+  // 1. Send via Persistent SMTP
+  if (mailTransporter) {
     try {
-      const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS,
-        },
-      });
-
-      await transporter.sendMail({
+      const adminOptions = {
         from: `"CEFI Export Desk" <${process.env.EMAIL_USER}>`,
         to: targetEmail,
         replyTo: email,
         subject: emailSubject,
         text: `New Wholesale Quote Request from ${name} (${company}):\n\nProduct: ${product}\nQuantity: ${quantity}\nDestination: ${targetDestination}\nContact: ${email} | ${phone}\n\nNotes:\n${notes}`,
         html: htmlContent,
-      });
-      console.log(`✅ [Nodemailer] Quote request delivered to ${targetEmail}`);
+      };
 
-      // Send confirmation to client
-      if (email && email !== targetEmail) {
-        const clientConfirmHtml = `
+      const customerOptions = (email && email !== targetEmail) ? {
+        from: `"Ceylon Eco Fresh Infinity" <${process.env.EMAIL_USER}>`,
+        to: email,
+        subject: `✅ Quote Request Received — ${product} | CEFI`,
+        text: `Dear ${name},\n\nThank you for your quotation request for ${product} (${quantity}) to ${targetDestination}.\n\nOur trade team will respond within 1–2 business days with a detailed proforma invoice.\n\nFor urgent matters, contact us at +94 714 634 485.\n\nBest regards,\nCeylon Eco Fresh Infinity Export Team`,
+        html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
             <div style="background-color: #1F532E; color: #ffffff; padding: 24px; text-align: center;">
               <h2 style="margin: 0; color: #D4AF37; font-size: 22px;">Ceylon Eco Fresh Infinity (Pvt) Ltd</h2>
@@ -775,20 +817,13 @@ ${notes}
               Ceylon Eco Fresh Infinity (Pvt) Ltd · No. 278/1/A, Meegasmulla, Dedigamuwa · ceylonecofreshinfinity@gmail.com
             </div>
           </div>
-        `;
-        await transporter.sendMail({
-          from: `"Ceylon Eco Fresh Infinity" <${process.env.EMAIL_USER}>`,
-          to: email,
-          subject: `✅ Quote Request Received — ${product} | CEFI`,
-          text: `Dear ${name},\n\nThank you for your quotation request for ${product} (${quantity}) to ${targetDestination}.\n\nOur trade team will respond within 1–2 business days with a detailed proforma invoice.\n\nFor urgent matters, contact us at +94 714 634 485.\n\nBest regards,\nCeylon Eco Fresh Infinity Export Team`,
-          html: clientConfirmHtml,
-        });
-        console.log(`✅ [Nodemailer] Quote confirmation sent to client: ${email}`);
-      }
+        `
+      } : null;
 
-      return { success: true, method: 'smtp' };
+      const result = await sendDualEmails(adminOptions, customerOptions);
+      if (result.success) return { success: true, method: 'smtp' };
     } catch (err) {
-      console.warn('⚠️ [Nodemailer] Quote email SMTP failed, falling back to HTTP delivery:', err.message);
+      console.warn('⚠️ [Nodemailer] Quote email failed:', err.message);
     }
   }
 
@@ -929,19 +964,10 @@ async function sendOrderEmail(orderRecord) {
     </div>
   `;
 
-  // 1. Send via Nodemailer SMTP if credentials provided
-  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+  // 1. Send via Persistent SMTP
+  if (mailTransporter) {
     try {
-      const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS,
-        },
-      });
-
-      // 1a. Notify CEFI admin
-      await transporter.sendMail({
+      const adminOptions = {
         from: `"CEFI Export Orders" <${process.env.EMAIL_USER}>`,
         to: targetEmail,
         replyTo: customer.email,
@@ -949,12 +975,14 @@ async function sendOrderEmail(orderRecord) {
         headers: { 'X-Priority': '1', 'X-MSMail-Priority': 'High', 'Importance': 'High' },
         text: `New Order: ${orderRecord.orderId}\nCustomer: ${customer.name} (${customer.email})\nPhone: ${customer.phone}\nAddress: ${customer.address}, ${customer.city}, ${customer.country}\n\nProducts:\n${itemsText}`,
         html: htmlContent,
-      });
-      console.log(`✅ [Nodemailer] Order notification delivered to ${targetEmail}`);
+      };
 
-      // 1b. Send order confirmation to the customer
-      if (customer.email && customer.email !== targetEmail) {
-        const customerOrderHtml = `
+      const customerOptions = (customer.email && customer.email !== targetEmail) ? {
+        from: `"Ceylon Eco Fresh Infinity" <${process.env.EMAIL_USER}>`,
+        to: customer.email,
+        subject: `✅ Order Received [${orderRecord.orderId}] — Ceylon Eco Fresh Infinity`,
+        text: `Dear ${customer.name},\n\nThank you for your order! Your Order ID is: ${orderRecord.orderId}\n\nProducts:\n${itemsText}\n\nDelivery to: ${customer.address}, ${customer.city}, ${customer.country}\n\nWe will contact you within 24 hours.\n\nBest regards,\nCeylon Eco Fresh Infinity`,
+        html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
             <div style="background-color: #1F532E; color: #ffffff; padding: 24px; text-align: center;">
               <h2 style="margin: 0; color: #D4AF37; font-size: 22px;">Ceylon Eco Fresh Infinity (Pvt) Ltd</h2>
@@ -986,18 +1014,11 @@ async function sendOrderEmail(orderRecord) {
               Ceylon Eco Fresh Infinity (Pvt) Ltd · No. 278/1/A, Meegasmulla, Dedigamuwa · ceylonecofreshinfinity@gmail.com
             </div>
           </div>
-        `;
-        await transporter.sendMail({
-          from: `"Ceylon Eco Fresh Infinity" <${process.env.EMAIL_USER}>`,
-          to: customer.email,
-          subject: `✅ Order Received [${orderRecord.orderId}] — Ceylon Eco Fresh Infinity`,
-          text: `Dear ${customer.name},\n\nThank you for your order! Your Order ID is: ${orderRecord.orderId}\n\nProducts:\n${itemsText}\n\nDelivery to: ${customer.address}, ${customer.city}, ${customer.country}\n\nWe will contact you within 24 hours.\n\nBest regards,\nCeylon Eco Fresh Infinity`,
-          html: customerOrderHtml,
-        });
-        console.log(`✅ [Nodemailer] Order confirmation sent to customer: ${customer.email}`);
-      }
+        `
+      } : null;
 
-      return { success: true, method: 'smtp' };
+      const result = await sendDualEmails(adminOptions, customerOptions);
+      if (result.success) return { success: true, method: 'smtp' };
     } catch (smtpErr) {
       console.warn('⚠️ [Nodemailer] SMTP failed, attempting fallback API delivery:', smtpErr.message);
     }
