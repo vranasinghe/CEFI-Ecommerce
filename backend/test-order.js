@@ -2,8 +2,8 @@ const http = require('http');
 
 const orderPayload = JSON.stringify({
   customer: {
-    name: 'Venuja Rana',
-    email: 'venujarana26@gmail.com',
+    name: 'Venuja Ranasinghe',
+    email: 'venujaranasinghe26@gmail.com',
     phone: '+94 71 463 4485',
     address: '80/44/c Panaluwa, Watareka',
     city: 'Colombo',
