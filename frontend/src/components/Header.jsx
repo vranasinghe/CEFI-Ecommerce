@@ -141,13 +141,6 @@ export default function Header({ onOpenQuoteModal }) {
               Contact Us
             </NavLink>
 
-            <NavLink 
-              to="/blog" 
-              className={({ isActive }) => isActive ? 'text-cefi-green font-bold border-b-2 border-cefi-gold pb-0.5' : 'hover:text-cefi-green transition-colors'}
-            >
-              Blog
-            </NavLink>
-
             {user?.role === 'admin' && (
               <NavLink 
                 to="/admin" 
@@ -301,9 +294,6 @@ export default function Header({ onOpenQuoteModal }) {
             </NavLink>
             <NavLink to="/contact" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-base font-semibold border-b border-gray-100">
               Contact Us
-            </NavLink>
-            <NavLink to="/blog" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-base font-semibold border-b border-gray-100">
-              Blog
             </NavLink>
             <NavLink to="/account" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-base font-semibold">
               My Account

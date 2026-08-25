@@ -148,9 +148,6 @@ export default function Footer() {
               <Link to="/about#sustainability" className="hover:text-cefi-gold transition-colors">Sustainability & Outgrowers</Link>
             </li>
             <li>
-              <Link to="/blog" className="hover:text-cefi-gold transition-colors">CEFI Trade & Quality Blog</Link>
-            </li>
-            <li>
               <Link to="/contact" className="hover:text-cefi-gold transition-colors">Export Quote Inquiry</Link>
             </li>
             <li>
