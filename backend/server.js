@@ -198,25 +198,38 @@ const defaultCatalogProfile = {
   }
 };
 
-app.get('/api/catalog-profile', (req, res) => {
-  try {
-    if (fs.existsSync(catalogProfilePath)) {
-      const data = JSON.parse(fs.readFileSync(catalogProfilePath, 'utf8'));
-      return res.json(data);
-    }
-  } catch (e) {
-    console.error('Error reading catalogProfile.json:', e);
+let currentCatalogProfile = defaultCatalogProfile;
+try {
+  if (fs.existsSync(catalogProfilePath)) {
+    currentCatalogProfile = JSON.parse(fs.readFileSync(catalogProfilePath, 'utf8'));
   }
-  return res.json(defaultCatalogProfile);
+} catch (e) {
+  console.warn('Could not read catalogProfile.json on startup:', e.message);
+}
+
+function saveCatalogProfile(data) {
+  currentCatalogProfile = { ...defaultCatalogProfile, ...data };
+  try {
+    fs.writeFileSync(catalogProfilePath, JSON.stringify(currentCatalogProfile, null, 2), 'utf8');
+  } catch (e) {
+    console.warn('Filesystem is read-only (e.g. Vercel serverless), stored in-memory:', e.message);
+  }
+}
+
+app.get('/api/catalog-profile', (req, res) => {
+  return res.json(currentCatalogProfile || defaultCatalogProfile);
 });
 
 app.post('/api/catalog-profile', (req, res) => {
   try {
     const updated = req.body;
-    fs.writeFileSync(catalogProfilePath, JSON.stringify(updated, null, 2), 'utf8');
-    return res.json({ success: true, message: 'Catalog profile updated successfully', data: updated });
+    if (!updated || typeof updated !== 'object') {
+      return res.status(400).json({ success: false, error: 'Invalid profile data' });
+    }
+    saveCatalogProfile(updated);
+    return res.json({ success: true, message: 'Catalog profile updated successfully', data: currentCatalogProfile });
   } catch (e) {
-    console.error('Error saving catalogProfile.json:', e);
+    console.error('Error saving catalog profile:', e);
     return res.status(500).json({ success: false, error: 'Failed to update catalog profile' });
   }
 });
@@ -224,10 +237,13 @@ app.post('/api/catalog-profile', (req, res) => {
 app.put('/api/catalog-profile', (req, res) => {
   try {
     const updated = req.body;
-    fs.writeFileSync(catalogProfilePath, JSON.stringify(updated, null, 2), 'utf8');
-    return res.json({ success: true, message: 'Catalog profile updated successfully', data: updated });
+    if (!updated || typeof updated !== 'object') {
+      return res.status(400).json({ success: false, error: 'Invalid profile data' });
+    }
+    saveCatalogProfile(updated);
+    return res.json({ success: true, message: 'Catalog profile updated successfully', data: currentCatalogProfile });
   } catch (e) {
-    console.error('Error saving catalogProfile.json:', e);
+    console.error('Error saving catalog profile:', e);
     return res.status(500).json({ success: false, error: 'Failed to update catalog profile' });
   }
 });

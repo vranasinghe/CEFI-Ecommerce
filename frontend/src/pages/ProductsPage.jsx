@@ -37,8 +37,18 @@ export default function ProductsPage({ onOpenQuoteModal }) {
     // Fetch catalog profile
     fetch('/api/catalog-profile')
       .then(res => res.json())
-      .then(data => setCatalogProfile(data))
-      .catch(() => {});
+      .then(data => {
+        if (data && data.all) {
+          setCatalogProfile(data);
+          try { localStorage.setItem('cefi_catalog_profile', JSON.stringify(data)); } catch {}
+        }
+      })
+      .catch(() => {
+        try {
+          const cached = localStorage.getItem('cefi_catalog_profile');
+          if (cached) setCatalogProfile(JSON.parse(cached));
+        } catch {}
+      });
   }, []);
 
   useEffect(() => {

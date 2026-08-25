@@ -130,7 +130,13 @@ export default function AdminDashboard() {
       fetch('/api/products').then(r => r.json()),
       fetch('/api/categories').then(r => r.json()),
       fetch('/api/orders').then(r => r.json()).catch(() => []),
-      fetch('/api/catalog-profile').then(r => r.json()).catch(() => null),
+      fetch('/api/catalog-profile').then(r => r.json()).catch(() => {
+        try {
+          const cached = localStorage.getItem('cefi_catalog_profile');
+          if (cached) return JSON.parse(cached);
+        } catch {}
+        return null;
+      }),
       fetch('/api/blog').then(r => r.json()).catch(() => []),
     ])
       .then(([prods, cats, ords, catProfile, blogData]) => {
@@ -149,6 +155,7 @@ export default function AdminDashboard() {
   const handleSaveCatalogProfile = async () => {
     setSavingCatalog(true);
     try {
+      try { localStorage.setItem('cefi_catalog_profile', JSON.stringify(catalogProfile)); } catch {}
       const res = await fetch('/api/catalog-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -158,7 +165,7 @@ export default function AdminDashboard() {
       if (data.success) {
         showToast('Catalog profile updated & published to storefront!');
       } else {
-        showToast('Failed to save catalog profile.', 'error');
+        showToast(data.error || 'Failed to save catalog profile.', 'error');
       }
     } catch {
       showToast('Network error saving catalog profile.', 'error');
