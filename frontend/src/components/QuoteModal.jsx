@@ -27,41 +27,48 @@ export default function QuoteModal({ isOpen, onClose, initialProduct = '' }) {
 
     let sent = false;
 
-    // 1. Backend API
+    // 1. Web3Forms (Shows "CEFI Quotes" as Sender in Gmail)
     try {
-      const res = await fetch('/api/quotes', {
+      const w3Res = await fetch('https://api.web3forms.com/submit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '2a8d834e-5677-4c4c-b610-6844fe2ba187',
+          from_name: "CEFI Quotes",
+          subject: `📋 [Wholesale Quote] ${formData.companyName || formData.contactPerson} (${formData.productName})`,
+          name: formData.contactPerson,
+          company: formData.companyName,
+          email: formData.email,
+          phone: formData.phone || 'N/A',
+          product: formData.productName,
+          estimated_quantity: formData.estimatedQuantity,
+          destination: formData.targetDestination,
+          notes: formData.notes || 'None'
+        })
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) sent = true;
-      }
+      const w3Data = await w3Res.json();
+      if (w3Data.success) sent = true;
     } catch (err) {}
 
-    // 2. Web3Forms fallback
+    // 2. FormSubmit Fallback
     if (!sent) {
       try {
-        const w3Res = await fetch('https://api.web3forms.com/submit', {
+        await fetch('https://formsubmit.co/ajax/ceylonecofreshinfinity@gmail.com', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           body: JSON.stringify({
-            access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '2a8d834e-5677-4c4c-b610-6844fe2ba187',
-            from_name: "Export Quotes",
-            subject: `📋 [Wholesale Quote] ${formData.companyName || formData.contactPerson} (${formData.productName})`,
+            _subject: `📋 [Wholesale Quote] ${formData.companyName || formData.contactPerson} (${formData.productName})`,
             name: formData.contactPerson,
             company: formData.companyName,
             email: formData.email,
             phone: formData.phone || 'N/A',
             product: formData.productName,
-            estimated_quantity: formData.estimatedQuantity,
+            quantity: formData.estimatedQuantity,
             destination: formData.targetDestination,
             notes: formData.notes || 'None'
           })
         });
-        const w3Data = await w3Res.json();
-        if (w3Data.success) sent = true;
+        sent = true;
       } catch (err) {}
     }
 

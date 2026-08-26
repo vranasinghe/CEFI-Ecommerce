@@ -11,45 +11,34 @@ export default function Footer() {
     if (email) {
       let sent = false;
 
-      // 1. Backend
+      // 1. Web3Forms (Shows "CEFI Newsletter" as Sender in Gmail)
       try {
-        const res = await fetch('/api/newsletter', {
+        const w3Res = await fetch('https://api.web3forms.com/submit', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email })
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '2a8d834e-5677-4c4c-b610-6844fe2ba187',
+            from_name: "CEFI Newsletter",
+            subject: `📩 [Newsletter] New Subscription: ${email}`,
+            email: email,
+            message: `New subscriber email: ${email}`
+          })
         });
-        if (res.ok) sent = true;
+        if (w3Res.ok) sent = true;
       } catch (e) {}
 
-      // 2. Web3Forms fallback
-      if (!sent) {
-        try {
-          const w3Res = await fetch('https://api.web3forms.com/submit', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-            body: JSON.stringify({
-              access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '2a8d834e-5677-4c4c-b610-6844fe2ba187',
-              from_name: "Newsletter",
-              subject: 'New Newsletter Subscription',
-              email: email,
-              message: `New subscriber: ${email}`
-            })
-          });
-          if (w3Res.ok) sent = true;
-        } catch (e) {}
-      }
-
-      // 3. FormSubmit fallback
+      // 2. FormSubmit Fallback
       if (!sent) {
         try {
           await fetch('https://formsubmit.co/ajax/ceylonecofreshinfinity@gmail.com', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
             body: JSON.stringify({
-              _subject: '📩 New Newsletter Subscriber',
+              _subject: `📩 [Newsletter] New Subscription: ${email}`,
               email: email
             })
           });
+          sent = true;
         } catch (e) {}
       }
 
