@@ -5,16 +5,19 @@ const fs = require('fs');
 const nodemailer = require('nodemailer');
 require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
 
+const EMAIL_USER = process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
+const EMAIL_PASS = process.env.EMAIL_PASS || 'hlgjksvsobiresqc';
+
 // ── Persistent SSL SMTP Transporter Pool ─────────────────────────────────────
 let mailTransporter = null;
-if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+if (EMAIL_USER && EMAIL_PASS) {
   mailTransporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 465,
     secure: true,
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
+      user: EMAIL_USER,
+      pass: EMAIL_PASS,
     },
     pool: true,
     maxConnections: 5,
@@ -658,7 +661,7 @@ ${message}
   if (mailTransporter) {
     try {
       const adminOptions = {
-        from: `"CEFI Contact Form" <${process.env.EMAIL_USER.replace('@', '+website@')}>`,
+        from: `"CEFI Contact Form" <${EMAIL_USER.replace('@', '+website@')}>`,
         to: targetEmail,
         replyTo: email,
         subject: emailSubject,
@@ -667,7 +670,7 @@ ${message}
       };
 
       const customerOptions = (email && email !== targetEmail) ? {
-        from: `"Ceylon Eco Fresh Infinity" <${process.env.EMAIL_USER}>`,
+        from: `"Ceylon Eco Fresh Infinity" <${EMAIL_USER}>`,
         to: email,
         subject: `✅ We received your message, ${name.split(' ')[0]}! — CEFI`,
         text: `Dear ${name},\n\nThank you for contacting Ceylon Eco Fresh Infinity. We have received your message regarding "${subject}" and our team will respond within 24 hours.\n\nFor urgent matters, contact us at +94 714 634 485.\n\nBest regards,\nCeylon Eco Fresh Infinity Team`,
@@ -784,7 +787,7 @@ async function sendNewsletterEmail(email) {
   if (mailTransporter) {
     try {
       const adminOptions = {
-        from: `"CEFI Newsletter" <${process.env.EMAIL_USER.replace('@', '+website@')}>`,
+        from: `"CEFI Newsletter" <${EMAIL_USER.replace('@', '+website@')}>`,
         to: targetEmail,
         replyTo: email,
         subject: emailSubject,
@@ -793,7 +796,7 @@ async function sendNewsletterEmail(email) {
       };
 
       const customerOptions = (email && email !== targetEmail) ? {
-        from: `"Ceylon Eco Fresh Infinity" <${process.env.EMAIL_USER}>`,
+        from: `"Ceylon Eco Fresh Infinity" <${EMAIL_USER}>`,
         to: email,
         subject: `✅ Welcome to the CEFI Newsletter!`,
         text: `Thank you for subscribing to the Ceylon Eco Fresh Infinity newsletter!`,
@@ -895,7 +898,7 @@ ${notes}
   if (mailTransporter) {
     try {
       const adminOptions = {
-        from: `"CEFI Export Desk" <${process.env.EMAIL_USER.replace('@', '+website@')}>`,
+        from: `"CEFI Export Desk" <${EMAIL_USER.replace('@', '+website@')}>`,
         to: targetEmail,
         replyTo: email,
         subject: emailSubject,
@@ -904,7 +907,7 @@ ${notes}
       };
 
       const customerOptions = (email && email !== targetEmail) ? {
-        from: `"Ceylon Eco Fresh Infinity" <${process.env.EMAIL_USER}>`,
+        from: `"Ceylon Eco Fresh Infinity" <${EMAIL_USER}>`,
         to: email,
         subject: `✅ Quote Request Received — ${product} | CEFI`,
         text: `Dear ${name},\n\nThank you for your quotation request for ${product} (${quantity}) to ${targetDestination}.\n\nOur trade team will respond within 1–2 business days with a detailed proforma invoice.\n\nFor urgent matters, contact us at +94 714 634 485.\n\nBest regards,\nCeylon Eco Fresh Infinity Export Team`,
@@ -1081,7 +1084,7 @@ async function sendOrderEmail(orderRecord) {
   if (mailTransporter) {
     try {
       const adminOptions = {
-        from: `"CEFI Export Orders" <${process.env.EMAIL_USER.replace('@', '+website@')}>`,
+        from: `"CEFI Export Orders" <${EMAIL_USER.replace('@', '+website@')}>`,
         to: targetEmail,
         replyTo: customer.email,
         subject: subject,
@@ -1091,7 +1094,7 @@ async function sendOrderEmail(orderRecord) {
       };
 
       const customerOptions = (customer.email && customer.email !== targetEmail) ? {
-        from: `"Ceylon Eco Fresh Infinity" <${process.env.EMAIL_USER}>`,
+        from: `"Ceylon Eco Fresh Infinity" <${EMAIL_USER}>`,
         to: customer.email,
         subject: `✅ Order Received [${orderRecord.orderId}] — Ceylon Eco Fresh Infinity`,
         text: `Dear ${customer.name},\n\nThank you for your order! Your Order ID is: ${orderRecord.orderId}\n\nProducts:\n${itemsText}\n\nDelivery to: ${customer.address}, ${customer.city}, ${customer.country}\n\nWe will contact you within 24 hours.\n\nBest regards,\nCeylon Eco Fresh Infinity`,
