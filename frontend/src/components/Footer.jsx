@@ -10,10 +10,19 @@ export default function Footer() {
     e.preventDefault();
     if (email) {
       try {
-        await fetch('/api/newsletter', {
+        await fetch('https://api.web3forms.com/submit', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email })
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json'
+          },
+          body: JSON.stringify({
+            access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '2a8d834e-5677-4c4c-b610-6844fe2ba187',
+            from_name: "Newsletter",
+            subject: 'New Newsletter Subscription',
+            email: email,
+            message: `New subscriber email: ${email}`
+          })
         });
       } catch (e) {
         // ignore
