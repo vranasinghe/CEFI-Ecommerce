@@ -658,7 +658,7 @@ ${message}
   if (mailTransporter) {
     try {
       const adminOptions = {
-        from: `"CEFI Contact Form" <${process.env.EMAIL_USER}>`,
+        from: `"CEFI Contact Form" <${process.env.EMAIL_USER.replace('@', '+website@')}>`,
         to: targetEmail,
         replyTo: email,
         subject: emailSubject,
@@ -784,7 +784,7 @@ async function sendNewsletterEmail(email) {
   if (mailTransporter) {
     try {
       const adminOptions = {
-        from: `"CEFI Newsletter" <${process.env.EMAIL_USER}>`,
+        from: `"CEFI Newsletter" <${process.env.EMAIL_USER.replace('@', '+website@')}>`,
         to: targetEmail,
         replyTo: email,
         subject: emailSubject,
@@ -895,7 +895,7 @@ ${notes}
   if (mailTransporter) {
     try {
       const adminOptions = {
-        from: `"CEFI Export Desk" <${process.env.EMAIL_USER}>`,
+        from: `"CEFI Export Desk" <${process.env.EMAIL_USER.replace('@', '+website@')}>`,
         to: targetEmail,
         replyTo: email,
         subject: emailSubject,
@@ -1081,7 +1081,7 @@ async function sendOrderEmail(orderRecord) {
   if (mailTransporter) {
     try {
       const adminOptions = {
-        from: `"CEFI Export Orders" <${process.env.EMAIL_USER}>`,
+        from: `"CEFI Export Orders" <${process.env.EMAIL_USER.replace('@', '+website@')}>`,
         to: targetEmail,
         replyTo: customer.email,
         subject: subject,
