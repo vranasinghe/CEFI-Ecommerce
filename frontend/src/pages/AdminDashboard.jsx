@@ -1003,8 +1003,8 @@ export default function AdminDashboard() {
               {/* Rendered Live Banner */}
               <div className="bg-cefi-green rounded-3xl p-8 sm:p-10 text-white relative overflow-hidden shadow-lg border border-emerald-800">
                 <div className="absolute top-0 right-0 w-80 h-80 bg-cefi-gold/10 rounded-full blur-3xl pointer-events-none"></div>
-                <div className="absolute -bottom-10 right-10 w-48 h-48 opacity-10 pointer-events-none select-none">
-                  <img src="/logo.png" alt="" className="w-full h-full object-contain brightness-0 invert" />
+                <div className="absolute -bottom-10 right-10 w-48 h-48 opacity-20 pointer-events-none select-none bg-white rounded-full p-4 flex items-center justify-center">
+                  <img src="/CEFI%20LOGO.svg" alt="" className="w-full h-full object-contain" />
                 </div>
 
                 <div className="relative z-10 max-w-3xl space-y-2.5">

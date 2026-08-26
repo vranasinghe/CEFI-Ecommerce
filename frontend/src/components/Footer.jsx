@@ -67,8 +67,8 @@ export default function Footer() {
         {/* Column 1: Brand & Tagline */}
         <div className="space-y-4">
           <Link to="/" className="flex items-center space-x-3">
-            <div className="w-12 h-12 flex items-center justify-center">
-              <img src="/logo.png" alt="CEFI Logo" className="w-full h-full object-contain drop-shadow-md brightness-0 invert opacity-90" />
+            <div className="w-12 h-12 flex items-center justify-center bg-white rounded-full p-1.5">
+              <img src="/CEFI%20LOGO.svg" alt="CEFI Logo" className="w-full h-full object-contain" />
             </div>
             <div className="h-10 w-48 sm:w-56">
               <img src="/logo-text.png" alt="CEFI Wordmark" className="w-full h-full object-contain object-left drop-shadow-sm brightness-0 invert opacity-90" />
