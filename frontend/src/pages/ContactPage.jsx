@@ -1,12 +1,5 @@
 import React, { useState, useRef } from 'react';
-import emailjs from '@emailjs/browser';
 import { Mail, Phone, MapPin, Send, CheckCircle2, Globe, Clock, Building } from 'lucide-react';
-
-// ── EmailJS Configuration (Fallback) ────────────────────────────────────────
-const EMAILJS_SERVICE_ID  = 'service_esc398x';
-const EMAILJS_TEMPLATE_ID = 'template_an5f25r';
-const EMAILJS_PUBLIC_KEY  = 'zNFcAnT75D9PGlHIR';
-// ──────────────────────────────────────────────────────────────────────────
 
 export default function ContactPage() {
   const formRef = useRef(null);
@@ -29,58 +22,31 @@ export default function ContactPage() {
     setError('');
 
     try {
-      // 1. Submit to backend API which sends email via authenticated Gmail SMTP
-      const res = await fetch('/api/contact', {
+      const res = await fetch('https://api.web3forms.com/submit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
+        body: JSON.stringify({
+          access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY,
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          subject: formData.subject,
+          message: formData.message,
+        })
       });
       const data = await res.json();
 
       if (data.success) {
         setSubmitted(true);
       } else {
-        // If backend returned error, try EmailJS as fallback
-        await emailjs.send(
-          EMAILJS_SERVICE_ID,
-          EMAILJS_TEMPLATE_ID,
-          {
-            to_email: 'ceylonecofreshinfinity@gmail.com',
-            from_name: formData.name,
-            from_email: formData.email,
-            phone: formData.phone,
-            subject: formData.subject,
-            message: formData.message,
-            name: formData.name,
-            email: formData.email,
-          },
-          { publicKey: EMAILJS_PUBLIC_KEY }
-        );
-        setSubmitted(true);
+        setError(data.message || 'Could not dispatch message. Please try again.');
       }
     } catch (err) {
-      console.warn('API error, trying EmailJS fallback:', err);
-      try {
-        await emailjs.send(
-          EMAILJS_SERVICE_ID,
-          EMAILJS_TEMPLATE_ID,
-          {
-            to_email: 'ceylonecofreshinfinity@gmail.com',
-            from_name: formData.name,
-            from_email: formData.email,
-            phone: formData.phone,
-            subject: formData.subject,
-            message: formData.message,
-            name: formData.name,
-            email: formData.email,
-          },
-          { publicKey: EMAILJS_PUBLIC_KEY }
-        );
-        setSubmitted(true);
-      } catch (emailErr) {
-        console.error('All email delivery methods failed:', emailErr);
-        setError('Could not dispatch message. Please email us directly at ceylonecofreshinfinity@gmail.com');
-      }
+      console.error('Email delivery failed:', err);
+      setError('Could not dispatch message. Please email us directly at ceylonecofreshinfinity@gmail.com');
     } finally {
       setLoading(false);
     }
