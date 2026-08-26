@@ -55,7 +55,7 @@ export default function CheckoutPage() {
     const itemsSummary = cart.map(item => `• ${item.name} (Qty: ${item.quantity}) - $${(item.price * item.quantity).toFixed(2)}`).join('\n');
     const itemsLine = cart.map(item => `${item.name} x${item.quantity}`).join(', ');
 
-    // ══ 1. BACKEND API DISPATCH (Nodemailer Dual Delivery to Admin & Client) ══
+    // ══ 1. BACKEND API DISPATCH (Generates the Gorgeous Green & Gold HTML Template) ══
     try {
       const apiRes = await fetch('/api/orders', {
         method: 'POST',
@@ -73,43 +73,44 @@ export default function CheckoutPage() {
         const apiData = await apiRes.json();
         if (apiData.success) {
           orderSent = true;
-          console.log('✅ Backend API order confirmation dispatched!');
+          console.log('✅ Backend API order confirmation dispatched with gorgeous HTML template!');
         }
       }
     } catch (error) {
-      console.warn('Backend API order endpoint not reachable, using Web3Forms dispatch...', error);
+      console.warn('Backend API order endpoint not reachable, trying Web3Forms fallback...', error);
     }
 
-    // ══ 2. WEB3FORMS DISPATCH (Store & Client Notification) ══
-    try {
-      const w3Res = await fetch('https://api.web3forms.com/submit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json'
-        },
-        body: JSON.stringify({
-          access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '2a8d834e-5677-4c4c-b610-6844fe2ba187',
-          from_name: "CEFI Orders",
-          subject: `🛒 [New Order] ${orderId} - from ${formData.name}`,
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone || 'N/A',
-          delivery_address: `${formData.address}, ${formData.city}, ${formData.postalCode}, ${formData.country}`,
-          order_id: orderId,
-          order_items: itemsLine,
-          total_amount: `$${grandTotal.toFixed(2)}`,
-          payment_method: formData.paymentMethod || 'Direct Email Order',
-          message: `New Order Received!\n\nOrder ID: ${orderId}\nCustomer: ${formData.name} (${formData.email}, ${formData.phone || 'No phone'})\nDelivery Address: ${formData.address}, ${formData.city}, ${formData.postalCode}, ${formData.country}\n\nOrdered Products:\n${itemsSummary}\n\nShipping: $${shippingCost.toFixed(2)}\nGrand Total: $${grandTotal.toFixed(2)}\nPayment Method: ${formData.paymentMethod || 'Direct Email Order'}`
-        })
-      });
-      const w3Data = await w3Res.json();
-      if (w3Data.success) {
-        orderSent = true;
-        console.log('✅ Web3Forms order email dispatched successfully!');
+    // ══ 2. WEB3FORMS FALLBACK (Only triggers if backend API was unavailable) ══
+    if (!orderSent) {
+      try {
+        const w3Res = await fetch('https://api.web3forms.com/submit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json'
+          },
+          body: JSON.stringify({
+            access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '2a8d834e-5677-4c4c-b610-6844fe2ba187',
+            from_name: "CEFI Orders",
+            subject: `🛒 [New Order] ${orderId} - from ${formData.name}`,
+            name: formData.name,
+            email: formData.email,
+            phone: formData.phone || 'N/A',
+            delivery_address: `${formData.address}, ${formData.city}, ${formData.postalCode}, ${formData.country}`,
+            order_id: orderId,
+            order_items: itemsLine,
+            total_amount: `$${grandTotal.toFixed(2)}`,
+            payment_method: formData.paymentMethod || 'Direct Email Order',
+            message: `New Order Received!\n\nOrder ID: ${orderId}\nCustomer: ${formData.name} (${formData.email}, ${formData.phone || 'No phone'})\nDelivery Address: ${formData.address}, ${formData.city}, ${formData.postalCode}, ${formData.country}\n\nOrdered Products:\n${itemsSummary}\n\nShipping: $${shippingCost.toFixed(2)}\nGrand Total: $${grandTotal.toFixed(2)}\nPayment Method: ${formData.paymentMethod || 'Direct Email Order'}`
+          })
+        });
+        const w3Data = await w3Res.json();
+        if (w3Data.success) {
+          orderSent = true;
+        }
+      } catch (w3Err) {
+        console.warn('Web3Forms dispatch failed, attempting FormSubmit fallback...', w3Err);
       }
-    } catch (w3Err) {
-      console.warn('Web3Forms dispatch failed, attempting FormSubmit fallback...', w3Err);
     }
 
     // ══ 3. FORMSUBMIT FALLBACK ══
