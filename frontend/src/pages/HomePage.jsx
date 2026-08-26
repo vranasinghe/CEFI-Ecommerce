@@ -58,22 +58,50 @@ export default function HomePage({ onOpenQuoteModal }) {
   const handleNewsletter = async (e) => {
     e.preventDefault();
     if (newsletterEmail) {
+      let sent = false;
+
+      // 1. Backend
       try {
-        await fetch('https://api.web3forms.com/submit', {
+        const res = await fetch('/api/newsletter', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json'
-          },
-          body: JSON.stringify({
-            access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '2a8d834e-5677-4c4c-b610-6844fe2ba187',
-            from_name: "Newsletter",
-            subject: 'New Newsletter Subscription',
-            email: newsletterEmail,
-            message: `New subscriber email: ${newsletterEmail}`
-          })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: newsletterEmail })
         });
+        if (res.ok) sent = true;
       } catch (err) {}
+
+      // 2. Web3Forms fallback
+      if (!sent) {
+        try {
+          const w3Res = await fetch('https://api.web3forms.com/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({
+              access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '2a8d834e-5677-4c4c-b610-6844fe2ba187',
+              from_name: "Newsletter",
+              subject: 'New Newsletter Subscription',
+              email: newsletterEmail,
+              message: `New subscriber: ${newsletterEmail}`
+            })
+          });
+          if (w3Res.ok) sent = true;
+        } catch (err) {}
+      }
+
+      // 3. FormSubmit fallback
+      if (!sent) {
+        try {
+          await fetch('https://formsubmit.co/ajax/ceylonecofreshinfinity@gmail.com', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({
+              _subject: '📩 New Newsletter Subscriber',
+              email: newsletterEmail
+            })
+          });
+        } catch (err) {}
+      }
+
       setNewsletterSubscribed(true);
       setNewsletterEmail('');
     }
