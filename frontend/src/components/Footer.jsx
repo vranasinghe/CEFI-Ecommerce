@@ -10,18 +10,10 @@ export default function Footer() {
     e.preventDefault();
     if (email) {
       try {
-        await fetch('https://api.web3forms.com/submit', {
+        await fetch('/api/newsletter', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json'
-          },
-          body: JSON.stringify({
-            access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY,
-            subject: 'New Newsletter Subscription',
-            email: email,
-            message: `You have a new newsletter subscription from: ${email}`
-          })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
         });
       } catch (e) {
         // ignore

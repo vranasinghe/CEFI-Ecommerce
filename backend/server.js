@@ -757,6 +757,103 @@ app.post('/api/contact', async (req, res) => {
   });
 });
 
+// ── Newsletter Route (POST /api/newsletter) ──────────────────────────────────
+async function sendNewsletterEmail(email) {
+  const targetEmail = process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
+  const emailSubject = `📩 New Newsletter Subscriber: ${email}`;
+
+  const htmlContent = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
+      <div style="background-color: #1F532E; color: #ffffff; padding: 24px; text-align: center;">
+        <h2 style="margin: 0; color: #D4AF37; font-size: 22px;">Ceylon Eco Fresh Infinity (Pvt) Ltd</h2>
+        <p style="margin: 6px 0 0; font-size: 13px; color: #d1fae5;">New Newsletter Subscription</p>
+      </div>
+      <div style="padding: 24px; color: #334155;">
+        <h3 style="color: #1F532E; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; font-size: 15px;">Subscriber Details</h3>
+        <table style="width: 100%; font-size: 13px; line-height: 1.6; margin-bottom: 20px;">
+          <tr><td style="width: 140px; font-weight: bold; color: #64748b;">Email Address:</td><td><a href="mailto:${email}" style="color: #1F532E; font-weight: bold;">${email}</a></td></tr>
+          <tr><td style="font-weight: bold; color: #64748b;">Subscribed At:</td><td>${new Date().toLocaleString()}</td></tr>
+        </table>
+      </div>
+      <div style="background-color: #f8fafc; padding: 14px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
+        Ceylon Eco Fresh Infinity (Pvt) Ltd · Automated Web Portal Dispatch
+      </div>
+    </div>
+  `;
+
+  if (mailTransporter) {
+    try {
+      const adminOptions = {
+        from: `"CEFI Newsletter" <${process.env.EMAIL_USER}>`,
+        to: targetEmail,
+        replyTo: email,
+        subject: emailSubject,
+        text: `New Newsletter Subscription from ${email}`,
+        html: htmlContent,
+      };
+
+      const customerOptions = (email && email !== targetEmail) ? {
+        from: `"Ceylon Eco Fresh Infinity" <${process.env.EMAIL_USER}>`,
+        to: email,
+        subject: `✅ Welcome to the CEFI Newsletter!`,
+        text: `Thank you for subscribing to the Ceylon Eco Fresh Infinity newsletter!`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
+            <div style="background-color: #1F532E; color: #ffffff; padding: 24px; text-align: center;">
+              <h2 style="margin: 0; color: #D4AF37; font-size: 22px;">Ceylon Eco Fresh Infinity (Pvt) Ltd</h2>
+              <p style="margin: 6px 0 0; font-size: 13px; color: #d1fae5;">Subscription Confirmed</p>
+            </div>
+            <div style="padding: 24px; color: #334155;">
+              <p style="font-size: 14px; color: #475569; line-height: 1.6;">Thank you for subscribing to our newsletter! You will now receive our latest updates on Ceylon export products, tea harvests, and spice catalogs directly to your inbox.</p>
+            </div>
+            <div style="background-color: #f8fafc; padding: 14px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
+              Ceylon Eco Fresh Infinity (Pvt) Ltd · No. 278/1/A, Meegasmulla, Dedigamuwa
+            </div>
+          </div>
+        `
+      } : null;
+
+      const result = await sendDualEmails(adminOptions, customerOptions);
+      if (result.success) return { success: true, method: 'smtp' };
+    } catch (err) {
+      console.warn('⚠️ [Nodemailer] Newsletter email failed:', err.message);
+    }
+  }
+
+  // Fallback
+  try {
+    const payload = {
+      _subject: emailSubject,
+      _replyto: email,
+      email,
+      subscribed_at: new Date().toLocaleString()
+    };
+    await fetch(`https://formsubmit.co/ajax/${targetEmail}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return { success: true, method: 'formsubmit' };
+  } catch (apiErr) {
+    return { success: true, method: 'recorded' };
+  }
+}
+
+app.post('/api/newsletter', async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ success: false, message: 'Email is required.' });
+  }
+
+  console.log(`📬 New Newsletter Subscriber: ${email}`);
+  const dispatchResult = await sendNewsletterEmail(email);
+  return res.json({
+    success: true,
+    message: 'Successfully subscribed to the newsletter!',
+    dispatch: dispatchResult
+  });
+});
+
 // ── Quote Request Email Delivery Function ────────────────────────────────────
 async function sendQuoteEmail(record) {
   const targetEmail = process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
