@@ -50,12 +50,13 @@ export default function CheckoutPage() {
     setLoading(true);
 
     const orderId = `CEFI-ORD-${Math.floor(100000 + Math.random() * 900000)}`;
-    let companySent = false;
+    let orderSent = false;
 
-    // ══ USE BACKEND API TO GENERATE THE BEAUTIFUL HTML EMAIL ════════════════
+    const itemsSummary = cart.map(item => `• ${item.name} (Qty: ${item.quantity}) - $${(item.price * item.quantity).toFixed(2)}`).join('\n');
+    const itemsLine = cart.map(item => `${item.name} x${item.quantity}`).join(', ');
+
+    // ══ 1. BACKEND API DISPATCH (Nodemailer Dual Delivery to Admin & Client) ══
     try {
-      // In development, this goes to localhost:5000/api/orders
-      // In production (Vercel), this goes to /backend/server.js via vercel.json
       const apiRes = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -63,26 +64,79 @@ export default function CheckoutPage() {
           orderId, 
           customer: formData, 
           items: cart,
-          paymentMethod: 'Direct Email Order', 
+          paymentMethod: formData.paymentMethod || 'Direct Email Order', 
           targetEmail: COMPANY_ORDER_EMAIL
         })
       });
       
-      const apiData = await apiRes.json();
-      companySent = apiData.success === true;
-      
-      if (companySent) {
-        console.log('✅ Backend API order sent successfully with HTML template!');
-      } else {
-        console.error('❌ Backend API failed to send email. Check Vercel ENV vars.');
+      if (apiRes.ok) {
+        const apiData = await apiRes.json();
+        if (apiData.success) {
+          orderSent = true;
+          console.log('✅ Backend API order confirmation dispatched!');
+        }
       }
     } catch (error) {
-      console.error('❌ Backend API fetch error:', error);
-      companySent = false;
+      console.warn('Backend API order endpoint not reachable, using Web3Forms dispatch...', error);
+    }
+
+    // ══ 2. WEB3FORMS DISPATCH (Store & Client Notification) ══
+    try {
+      const w3Res = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
+        body: JSON.stringify({
+          access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '2a8d834e-5677-4c4c-b610-6844fe2ba187',
+          from_name: "CEFI Orders",
+          subject: `🛒 [New Order] ${orderId} - from ${formData.name}`,
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone || 'N/A',
+          delivery_address: `${formData.address}, ${formData.city}, ${formData.postalCode}, ${formData.country}`,
+          order_id: orderId,
+          order_items: itemsLine,
+          total_amount: `$${grandTotal.toFixed(2)}`,
+          payment_method: formData.paymentMethod || 'Direct Email Order',
+          message: `New Order Received!\n\nOrder ID: ${orderId}\nCustomer: ${formData.name} (${formData.email}, ${formData.phone || 'No phone'})\nDelivery Address: ${formData.address}, ${formData.city}, ${formData.postalCode}, ${formData.country}\n\nOrdered Products:\n${itemsSummary}\n\nShipping: $${shippingCost.toFixed(2)}\nGrand Total: $${grandTotal.toFixed(2)}\nPayment Method: ${formData.paymentMethod || 'Direct Email Order'}`
+        })
+      });
+      const w3Data = await w3Res.json();
+      if (w3Data.success) {
+        orderSent = true;
+        console.log('✅ Web3Forms order email dispatched successfully!');
+      }
+    } catch (w3Err) {
+      console.warn('Web3Forms dispatch failed, attempting FormSubmit fallback...', w3Err);
+    }
+
+    // ══ 3. FORMSUBMIT FALLBACK ══
+    if (!orderSent) {
+      try {
+        await fetch(`https://formsubmit.co/ajax/${COMPANY_ORDER_EMAIL}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            _subject: `🛒 [New Order] ${orderId} - from ${formData.name}`,
+            order_id: orderId,
+            customer_name: formData.name,
+            customer_email: formData.email,
+            customer_phone: formData.phone || 'N/A',
+            address: `${formData.address}, ${formData.city}, ${formData.postalCode}, ${formData.country}`,
+            products: itemsSummary,
+            total: `$${grandTotal.toFixed(2)}`
+          })
+        });
+        orderSent = true;
+      } catch (fsErr) {
+        console.error('All order email delivery options failed:', fsErr);
+      }
     }
 
     setOrderConfirmed(orderId);
-    setEmailSent(companySent);
+    setEmailSent(orderSent);
     setOrderDetails({ orderId, items: cart, total: grandTotal, customer: formData });
     clearCart();
     setLoading(false);

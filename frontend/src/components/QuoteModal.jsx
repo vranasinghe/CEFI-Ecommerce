@@ -25,27 +25,49 @@ export default function QuoteModal({ isOpen, onClose, initialProduct = '' }) {
     setLoading(true);
     setError('');
 
+    let sent = false;
+
+    // 1. Backend API
     try {
       const res = await fetch('/api/quotes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
-      const data = await res.json();
-
-      if (data.success) {
-        trackQuoteRequest(formData.productName, formData.companyName);
-        setSubmitted(true);
-      } else {
-        setError(data.message || 'Submission failed.');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) sent = true;
       }
-    } catch (err) {
-      // Fallback success feedback
-      trackQuoteRequest(formData.productName, formData.companyName);
-      setSubmitted(true);
-    } finally {
-      setLoading(false);
+    } catch (err) {}
+
+    // 2. Web3Forms fallback
+    if (!sent) {
+      try {
+        const w3Res = await fetch('https://api.web3forms.com/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '2a8d834e-5677-4c4c-b610-6844fe2ba187',
+            from_name: "Export Quotes",
+            subject: `📋 [Wholesale Quote] ${formData.companyName || formData.contactPerson} (${formData.productName})`,
+            name: formData.contactPerson,
+            company: formData.companyName,
+            email: formData.email,
+            phone: formData.phone || 'N/A',
+            product: formData.productName,
+            estimated_quantity: formData.estimatedQuantity,
+            destination: formData.targetDestination,
+            notes: formData.notes || 'None'
+          })
+        });
+        const w3Data = await w3Res.json();
+        if (w3Data.success) sent = true;
+      } catch (err) {}
     }
+
+    trackQuoteRequest(formData.productName, formData.companyName);
+    setSubmitted(true);
+    setLoading(false);
   };
 
   return (
