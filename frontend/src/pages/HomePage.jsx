@@ -146,7 +146,7 @@ export default function HomePage({ onOpenQuoteModal }) {
               </h1>
 
               <p className="text-sm sm:text-base lg:text-lg text-cefi-earth/80 max-w-xl font-sans leading-relaxed">
-                Premium Sri Lankan tea, authentic True Cinnamon, rare spices, sun-dried tropical fruits, and organic agricultural produce processed and exported under world-class quality standards.
+                From the lush hills of Sri Lanka to tables around the world, we source and export premium Ceylon tea, authentic true cinnamon, rare exotic spices, organic fruits & vegetables, dried tropical produce, and natural herbal flowers and leaves. Every product is grown, processed, and exported in line with world-class quality standards, delivering the true taste of Sri Lanka to every corner of the globe.
               </p>
 
               <div className="pt-2 flex flex-wrap items-center gap-4">
