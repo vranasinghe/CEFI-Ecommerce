@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ChevronLeft, ChevronRight, Award, ShieldCheck, Truck, RefreshCw, Send, CheckCircle2, Sparkles, CreditCard, Headset } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ChevronRight, Award, ShieldCheck, Truck, RefreshCw, Send, CheckCircle2, Sparkles, CreditCard, Headset, Globe, Leaf, Layers } from 'lucide-react';
 import CategoryCard from '../components/CategoryCard';
 import ProductCard from '../components/ProductCard';
 import Reveal from '../components/Reveal';
@@ -409,7 +409,7 @@ export default function HomePage({ onOpenQuoteModal }) {
           <h2 className="font-serif font-bold text-3xl text-cefi-earth mt-1">Why Choose CEFI?</h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
 
           <Reveal delay={0} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-soft text-center space-y-3">
             <div className="w-14 h-14 bg-cefi-green/10 text-cefi-green rounded-2xl flex items-center justify-center mx-auto">
@@ -417,37 +417,77 @@ export default function HomePage({ onOpenQuoteModal }) {
             </div>
             <h3 className="font-serif font-bold text-lg text-cefi-earth">Premium Sri Lankan Origin</h3>
             <p className="text-xs text-gray-500 leading-relaxed">
-              Authentic Single-Origin Ceylon tea and True Cinnamon grown in Sri Lanka's unique soil microclimates.
+              Authentic single-origin Ceylon tea and true cinnamon, grown in Sri Lanka's unique soil and microclimates.
             </p>
           </Reveal>
 
-          <Reveal delay={90} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-soft text-center space-y-3">
+          <Reveal delay={60} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-soft text-center space-y-3">
             <div className="w-14 h-14 bg-cefi-green/10 text-cefi-green rounded-2xl flex items-center justify-center mx-auto">
               <ShieldCheck className="w-7 h-7" />
             </div>
             <h3 className="font-serif font-bold text-lg text-cefi-earth">Strict Quality Control</h3>
             <p className="text-xs text-gray-500 leading-relaxed">
-              HACCP & ISO 22000 compliant processing facilities ensuring zero contamination and maximum freshness.
+              Processing practices aligned with HACCP & ISO 22000 standards, ensuring zero contamination and maximum freshness.
             </p>
           </Reveal>
 
-          <Reveal delay={180} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-soft text-center space-y-3">
+          <Reveal delay={120} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-soft text-center space-y-3">
             <div className="w-14 h-14 bg-cefi-green/10 text-cefi-green rounded-2xl flex items-center justify-center mx-auto">
               <Truck className="w-7 h-7" />
             </div>
             <h3 className="font-serif font-bold text-lg text-cefi-earth">Reliable Supply Chain</h3>
             <p className="text-xs text-gray-500 leading-relaxed">
-              Guaranteed year-round inventory dispatch for retail distributors and bulk export buyers worldwide.
+              Guaranteed year round inventory and dispatch for retail distributors and bulk export buyers worldwide.
             </p>
           </Reveal>
 
-          <Reveal delay={270} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-soft text-center space-y-3">
+          <Reveal delay={180} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-soft text-center space-y-3">
             <div className="w-14 h-14 bg-cefi-green/10 text-cefi-green rounded-2xl flex items-center justify-center mx-auto">
               <RefreshCw className="w-7 h-7" />
             </div>
-            <h3 className="font-serif font-bold text-lg text-cefi-earth">Export-Ready Solutions</h3>
+            <h3 className="font-serif font-bold text-lg text-cefi-earth">Export Ready Solutions</h3>
             <p className="text-xs text-gray-500 leading-relaxed">
               Custom OEM private labeling, bulk vacuum packaging, and complete customs export documentation.
+            </p>
+          </Reveal>
+
+          <Reveal delay={240} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-soft text-center space-y-3">
+            <div className="w-14 h-14 bg-cefi-green/10 text-cefi-green rounded-2xl flex items-center justify-center mx-auto">
+              <Globe className="w-7 h-7" />
+            </div>
+            <h3 className="font-serif font-bold text-lg text-cefi-earth">Global Port Logistics</h3>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              FOB, CIF, and other flexible export solutions from Colombo Port, connecting Sri Lanka to more than 40 countries worldwide.
+            </p>
+          </Reveal>
+
+          <Reveal delay={300} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-soft text-center space-y-3">
+            <div className="w-14 h-14 bg-cefi-green/10 text-cefi-green rounded-2xl flex items-center justify-center mx-auto">
+              <Leaf className="w-7 h-7" />
+            </div>
+            <h3 className="font-serif font-bold text-lg text-cefi-earth">Genuine Ceylon Origin</h3>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Ethically sourced from accredited smallholder farms, authentic Ceylon quality, farm to shelf.
+            </p>
+          </Reveal>
+
+          <Reveal delay={360} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-soft text-center space-y-3">
+            <div className="w-14 h-14 bg-cefi-green/10 text-cefi-green rounded-2xl flex items-center justify-center mx-auto">
+              <Layers className="w-7 h-7" />
+            </div>
+            <h3 className="font-serif font-bold text-lg text-cefi-earth">Flexible Sourcing, Private Label & OEM Ready</h3>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              CEFI partners with trusted, certified manufacturing facilities across Sri Lanka to support bulk orders, custom private-label branding, and OEM packaging.
+            </p>
+          </Reveal>
+
+          <Reveal delay={420} className="bg-white rounded-2xl p-6 border border-gray-100 shadow-soft text-center space-y-3">
+            <div className="w-14 h-14 bg-cefi-green/10 text-cefi-green rounded-2xl flex items-center justify-center mx-auto">
+              <CheckCircle2 className="w-7 h-7" />
+            </div>
+            <h3 className="font-serif font-bold text-lg text-cefi-earth">Legally Registered & Trustworthy</h3>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              A duly incorporated private limited company (Reg. No. PV 00371966) under Sri Lanka's Companies Act No. 7 of 2007.
             </p>
           </Reveal>
 
