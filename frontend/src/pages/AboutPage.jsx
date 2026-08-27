@@ -26,13 +26,16 @@ export default function AboutPage() {
           <div className="lg:col-span-6 space-y-6">
             <span className="text-xs font-bold uppercase tracking-wider text-cefi-gold">Who We Are</span>
             <h2 className="font-serif font-bold text-3xl sm:text-4xl text-cefi-earth leading-tight">
-              Sri Lankan Agriculture & Natural Products Masterclass
+              Sri Lanka's Trusted Name in Premium Natural Products
             </h2>
             <p className="text-sm text-cefi-earth/80 leading-relaxed font-sans">
-              Ceylon Eco Fresh Infinity (Pvt) Ltd. (CEFI) is a premier Sri Lankan food & natural-products company that manufactures, trades, distributes, and exports fine teas, spices, coconut products, herbs, dried foods, and agricultural produce.
+              Ceylon Eco Fresh Infinity (Pvt) Ltd. (CEFI) is a specialized Sri Lankan enterprise dedicated to manufacturing, processing, and distributing high grade Ceylon Tea, True Cinnamon, unadulterated Spices, fresh and Dehydrated Fruits, Vegetables, and Herbal Products.
             </p>
             <p className="text-sm text-cefi-earth/80 leading-relaxed font-sans">
-              Founded on principles of uncompromised purity, environmental stewardship, and direct agricultural trade, CEFI connects local farming communities in Sri Lanka directly with international buyers, wholesalers, and retail consumers globally.
+              By maintaining direct partnerships with accredited outgrower farming communities across Sri Lanka's central highlands and southern spice belts, we ensure 100% traceability, ethical farmgate returns, and superior product integrity for international buyers and local retail customers alike.
+            </p>
+            <p className="text-sm text-cefi-earth/80 leading-relaxed font-sans">
+              Beyond our own farm-direct sourcing, CEFI also partners with trusted, certified manufacturing facilities across Sri Lanka to expand production capacity, supporting bulk orders, private label, and OEM solutions for brands and businesses worldwide.
             </p>
           </div>
 
@@ -62,7 +65,7 @@ export default function AboutPage() {
               </div>
               <h3 className="font-serif font-bold text-2xl text-cefi-earth group-hover:text-white transition-colors duration-300">Our Vision</h3>
               <p className="text-sm text-gray-600 group-hover:text-emerald-50 transition-colors duration-300 leading-relaxed">
-                To be the global gold standard for Sri Lankan natural products by delivering pure, sustainably grown Ceylon produce while enriching agricultural communities across our island home.
+                To be the global gold standard for Sri Lankan natural products delivering pure, sustainably grown Ceylon produce while enriching agricultural communities across our island home.
               </p>
             </div>
 
@@ -75,15 +78,15 @@ export default function AboutPage() {
               <ul className="space-y-2 text-sm text-gray-600 group-hover:text-emerald-50 transition-colors duration-300">
                 <li className="flex items-start space-x-2">
                   <CheckCircle2 className="w-4 h-4 text-cefi-green group-hover:text-white transition-colors duration-300 shrink-0 mt-0.5" />
-                  <span>To cultivate, process, and export authentic Ceylon tea, true cinnamon, and spices.</span>
+                  <span>To cultivate, process, and export authentic Ceylon tea, true cinnamon, and spices to the world.</span>
                 </li>
                 <li className="flex items-start space-x-2">
                   <CheckCircle2 className="w-4 h-4 text-cefi-green group-hover:text-white transition-colors duration-300 shrink-0 mt-0.5" />
-                  <span>To guarantee 100% pure, unadulterated product quality with zero chemical additives.</span>
+                  <span>To guarantee pure, high quality products with zero chemical additives or artificial dyes, where natural flavours are added to select tea products, they are clearly declared and ethically sourced.</span>
                 </li>
                 <li className="flex items-start space-x-2">
                   <CheckCircle2 className="w-4 h-4 text-cefi-green group-hover:text-white transition-colors duration-300 shrink-0 mt-0.5" />
-                  <span>To empower outgrower farm families through fair farmgate compensation and technology sharing.</span>
+                  <span>To empower outgrower farm families through fair farmgate compensation and shared agricultural knowledge.</span>
                 </li>
               </ul>
             </div>
@@ -98,25 +101,25 @@ export default function AboutPage() {
               <div className="group bg-white hover:bg-cefi-green transition-colors duration-300 p-6 rounded-2xl border border-gray-100 shadow-xs text-center space-y-2">
                 <Leaf className="w-8 h-8 text-cefi-green group-hover:text-white transition-colors duration-300 mx-auto" />
                 <h4 className="font-serif font-bold text-base text-cefi-earth group-hover:text-white transition-colors duration-300">Integrity & Purity</h4>
-                <p className="text-xs text-gray-500 group-hover:text-emerald-50 transition-colors duration-300">Unadulterated single-origin products without artificial dyes or additives.</p>
+                <p className="text-xs text-gray-500 group-hover:text-emerald-50 transition-colors duration-300">Unadulterated, single origin sourcing across our range, free from artificial dyes, synthetic additives, or chemical preservatives. Select tea products include only approved natural flavourings, clearly declared on pack.</p>
               </div>
 
               <div className="group bg-white hover:bg-cefi-green transition-colors duration-300 p-6 rounded-2xl border border-gray-100 shadow-xs text-center space-y-2">
                 <Heart className="w-8 h-8 text-cefi-green group-hover:text-white transition-colors duration-300 mx-auto" />
                 <h4 className="font-serif font-bold text-base text-cefi-earth group-hover:text-white transition-colors duration-300">Sustainability</h4>
-                <p className="text-xs text-gray-500 group-hover:text-emerald-50 transition-colors duration-300">Solar drying, organic soil conservation, and zero-waste processing.</p>
+                <p className="text-xs text-gray-500 group-hover:text-emerald-50 transition-colors duration-300">Solar drying, organic soil conservation, and zero waste processing practices.</p>
               </div>
 
               <div className="group bg-white hover:bg-cefi-green transition-colors duration-300 p-6 rounded-2xl border border-gray-100 shadow-xs text-center space-y-2">
                 <Award className="w-8 h-8 text-cefi-green group-hover:text-white transition-colors duration-300 mx-auto" />
                 <h4 className="font-serif font-bold text-base text-cefi-earth group-hover:text-white transition-colors duration-300">Excellence</h4>
-                <p className="text-xs text-gray-500 group-hover:text-emerald-50 transition-colors duration-300">Rigorous laboratory testing adhering to ISO 22000 & HACCP norms.</p>
+                <p className="text-xs text-gray-500 group-hover:text-emerald-50 transition-colors duration-300">Rigorous quality testing, aligned with ISO 22000 & HACCP standards.</p>
               </div>
 
               <div className="group bg-white hover:bg-cefi-green transition-colors duration-300 p-6 rounded-2xl border border-gray-100 shadow-xs text-center space-y-2">
                 <Users className="w-8 h-8 text-cefi-green group-hover:text-white transition-colors duration-300 mx-auto" />
                 <h4 className="font-serif font-bold text-base text-cefi-earth group-hover:text-white transition-colors duration-300">Community First</h4>
-                <p className="text-xs text-gray-500 group-hover:text-emerald-50 transition-colors duration-300">Supporting over 300 Sri Lankan smallholder families.</p>
+                <p className="text-xs text-gray-500 group-hover:text-emerald-50 transition-colors duration-300">Proudly supporting over 300 Sri Lankan smallholder families.</p>
               </div>
 
             </div>
@@ -185,6 +188,15 @@ export default function AboutPage() {
               <ArrowRight className="w-5 h-5" />
             </Link>
           </div>
+        </div>
+      </section>
+
+      {/* Legal Footer Notice */}
+      <section className="border-t border-gray-200 bg-gray-50 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="text-sm text-gray-600 leading-relaxed font-sans">
+            CEFI is a duly registered private limited company (Reg. No. PV 00371966) incorporated under Sri Lanka's Companies Act No. 7 of 2007, reflecting our commitment to full legal compliance and transparency for our partners and buyers worldwide.
+          </p>
         </div>
       </section>
 
