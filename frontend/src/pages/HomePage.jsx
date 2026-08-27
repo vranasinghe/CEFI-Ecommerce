@@ -359,11 +359,19 @@ export default function HomePage({ onOpenQuoteModal }) {
               </h2>
 
               <p className="text-sm text-cefi-earth/80 leading-relaxed font-sans">
-                Ceylon Eco Fresh Infinity (Pvt) Ltd. (CEFI) is a specialized Sri Lankan enterprise dedicated to manufacturing, processing, and distributing high-grade Ceylon Tea, True Cinnamon, unadulterated Spices, Coconut derivatives, and Dehydrated Fruits.
+                Ceylon Eco Fresh Infinity (Pvt) Ltd. (CEFI) is a specialized Sri Lankan enterprise dedicated to manufacturing, processing, and distributing high grade Ceylon Tea, True Cinnamon, unadulterated Spices, fresh and Dehydrated Fruits, Vegetables, and Herbal Products.
               </p>
 
               <p className="text-sm text-cefi-earth/80 leading-relaxed font-sans">
                 By maintaining direct partnerships with accredited outgrower farming communities across Sri Lanka's central highlands and southern spice belts, we ensure 100% traceability, ethical farmgate returns, and superior product integrity for international buyers and local retail customers alike.
+              </p>
+
+              <p className="text-sm text-cefi-earth/80 leading-relaxed font-sans">
+                Beyond our own farm direct sourcing, CEFI also partners with trusted, certified manufacturing facilities across Sri Lanka to expand production capacity, supporting bulk orders, private label, and OEM solutions for brands and businesses worldwide.
+              </p>
+
+              <p className="text-sm text-cefi-earth/80 leading-relaxed font-sans">
+                CEFI is a duly registered private limited company (Reg. No. PV 00371966) incorporated under Sri Lanka's Companies Act No. 7 of 2007, reflecting our commitment to full legal compliance and transparency for our partners and buyers worldwide.
               </p>
 
               {/* Feature Pills */}
