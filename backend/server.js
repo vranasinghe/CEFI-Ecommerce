@@ -3,10 +3,24 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
 
 const EMAIL_USER = process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
 const EMAIL_PASS = process.env.EMAIL_PASS || 'hlgjksvsobiresqc';
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'CEFI Notifications <onboarding@resend.dev>';
+
+// ── Initialize Resend Client ──────────────────────────────────────────────────
+let resendClient = null;
+if (RESEND_API_KEY) {
+  try {
+    resendClient = new Resend(RESEND_API_KEY);
+    console.log('✅ Resend Email API client initialized & ready.');
+  } catch (err) {
+    console.warn('⚠️ Could not initialize Resend client:', err.message);
+  }
+}
 
 // ── Persistent SSL SMTP Transporter Pool ─────────────────────────────────────
 let mailTransporter = null;
@@ -36,38 +50,105 @@ if (EMAIL_USER && EMAIL_PASS) {
   });
 }
 
-// Helper to send admin and customer emails concurrently
+// Helper to send individual message via Resend
+async function sendViaResend(options) {
+  if (!resendClient) return { error: { message: 'Resend not initialized' } };
+  return await resendClient.emails.send({
+    from: RESEND_FROM_EMAIL,
+    to: options.to,
+    reply_to: options.replyTo || options.reply_to || undefined,
+    subject: options.subject,
+    html: options.html,
+    text: options.text || undefined
+  });
+}
+
+// Helper to send admin and customer emails concurrently (Dual Send)
 async function sendDualEmails(adminOptions, customerOptions) {
-  if (!mailTransporter) return { success: false, error: 'No email credentials configured' };
+  let adminSent = false;
+  let customerSent = false;
 
-  const promises = [mailTransporter.sendMail(adminOptions)];
-  if (customerOptions && customerOptions.to && customerOptions.to !== adminOptions.to) {
-    promises.push(mailTransporter.sendMail(customerOptions));
-  }
+  // 1. Primary Attempt: Resend HTTPS API (Fastest & 100% serverless compatible)
+  if (resendClient) {
+    try {
+      const promises = [sendViaResend(adminOptions)];
+      if (customerOptions && customerOptions.to && customerOptions.to !== adminOptions.to) {
+        promises.push(sendViaResend(customerOptions));
+      }
 
-  const results = await Promise.allSettled(promises);
-  const adminResult = results[0];
-  const customerResult = results[1];
+      const resendResults = await Promise.allSettled(promises);
+      const adminRes = resendResults[0];
+      const customerRes = resendResults[1];
 
-  if (adminResult.status === 'fulfilled') {
-    console.log(`✅ [Nodemailer] Admin notification sent to ${adminOptions.to} (${adminResult.value.messageId})`);
-  } else {
-    console.error(`❌ [Nodemailer] Failed to send admin email:`, adminResult.reason?.message || adminResult.reason);
-  }
+      if (adminRes.status === 'fulfilled' && !adminRes.value?.error) {
+        adminSent = true;
+        console.log(`✅ [Resend] Admin email dispatched to ${adminOptions.to} (ID: ${adminRes.value?.data?.id || 'ok'})`);
+      } else {
+        console.warn(`⚠️ [Resend] Admin email notice:`, adminRes.value?.error?.message || adminRes.reason?.message || adminRes.reason);
+      }
 
-  if (customerResult) {
-    if (customerResult.status === 'fulfilled') {
-      console.log(`✅ [Nodemailer] Customer confirmation sent to ${customerOptions.to} (${customerResult.value.messageId})`);
-    } else {
-      console.warn(`⚠️ [Nodemailer] Customer confirmation failed (e.g. invalid recipient):`, customerResult.reason?.message || customerResult.reason);
+      if (customerRes) {
+        if (customerRes.status === 'fulfilled' && !customerRes.value?.error) {
+          customerSent = true;
+          console.log(`✅ [Resend] Customer confirmation dispatched to ${customerOptions.to} (ID: ${customerRes.value?.data?.id || 'ok'})`);
+        } else {
+          console.warn(`⚠️ [Resend] Customer email notice:`, customerRes.value?.error?.message || customerRes.reason?.message || customerRes.reason);
+        }
+      }
+
+      if (adminSent) {
+        return {
+          success: true,
+          method: 'resend',
+          adminSent,
+          customerSent: customerOptions ? customerSent : true
+        };
+      }
+    } catch (resendError) {
+      console.warn('⚠️ [Resend] Error during dual dispatch:', resendError.message);
     }
   }
 
-  return {
-    success: adminResult.status === 'fulfilled',
-    adminSent: adminResult.status === 'fulfilled',
-    customerSent: customerResult ? customerResult.status === 'fulfilled' : true
-  };
+  // 2. Fallback Attempt: Nodemailer SMTP
+  if (mailTransporter) {
+    try {
+      const promises = [mailTransporter.sendMail(adminOptions)];
+      if (customerOptions && customerOptions.to && customerOptions.to !== adminOptions.to) {
+        promises.push(mailTransporter.sendMail(customerOptions));
+      }
+
+      const results = await Promise.allSettled(promises);
+      const adminResult = results[0];
+      const customerResult = results[1];
+
+      if (adminResult.status === 'fulfilled') {
+        adminSent = true;
+        console.log(`✅ [Nodemailer] Admin notification sent to ${adminOptions.to} (${adminResult.value.messageId})`);
+      } else {
+        console.error(`❌ [Nodemailer] Failed to send admin email:`, adminResult.reason?.message || adminResult.reason);
+      }
+
+      if (customerResult) {
+        if (customerResult.status === 'fulfilled') {
+          customerSent = true;
+          console.log(`✅ [Nodemailer] Customer confirmation sent to ${customerOptions.to} (${customerResult.value.messageId})`);
+        } else {
+          console.warn(`⚠️ [Nodemailer] Customer confirmation failed:`, customerResult.reason?.message || customerResult.reason);
+        }
+      }
+
+      return {
+        success: adminResult.status === 'fulfilled',
+        method: 'smtp',
+        adminSent,
+        customerSent: customerResult ? customerResult.status === 'fulfilled' : true
+      };
+    } catch (smtpErr) {
+      console.warn('⚠️ [Nodemailer] SMTP exception:', smtpErr.message);
+    }
+  }
+
+  return { success: false, error: 'No email service succeeded' };
 }
 
 // Try to load multer (for file uploads)

@@ -15,7 +15,8 @@
     "express": "^4.19.2",
     "jimp": "^1.6.1",
     "multer": "^2.2.0",
-    "nodemailer": "^9.0.5"
+    "nodemailer": "^9.0.5",
+    "resend": "^6.25.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.4"
