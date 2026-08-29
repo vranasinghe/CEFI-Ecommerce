@@ -63,92 +63,71 @@ async function sendViaResend(options) {
   });
 }
 
-// Helper to send admin and customer emails concurrently (Dual Send)
+// Helper to send admin and customer emails concurrently (Smart Hybrid Dual Send)
 async function sendDualEmails(adminOptions, customerOptions) {
   let adminSent = false;
   let customerSent = false;
 
-  // 1. Primary Attempt: Resend HTTPS API (Fastest & 100% serverless compatible)
+  // ── 1. Dispatch Admin Notification via Resend (Fast & Serverless Ready) ─────
   if (resendClient) {
     try {
-      const promises = [sendViaResend(adminOptions)];
-      if (customerOptions && customerOptions.to && customerOptions.to !== adminOptions.to) {
-        promises.push(sendViaResend(customerOptions));
-      }
-
-      const resendResults = await Promise.allSettled(promises);
-      const adminRes = resendResults[0];
-      const customerRes = resendResults[1];
-
-      if (adminRes.status === 'fulfilled' && !adminRes.value?.error) {
+      const adminRes = await sendViaResend(adminOptions);
+      if (adminRes && !adminRes.error) {
         adminSent = true;
-        console.log(`✅ [Resend] Admin email dispatched to ${adminOptions.to} (ID: ${adminRes.value?.data?.id || 'ok'})`);
+        console.log(`✅ [Resend] Admin notification sent to ${adminOptions.to} (ID: ${adminRes.data?.id || 'ok'})`);
       } else {
-        console.warn(`⚠️ [Resend] Admin email notice:`, adminRes.value?.error?.message || adminRes.reason?.message || adminRes.reason);
+        console.warn(`⚠️ [Resend] Admin send notice:`, adminRes?.error?.message || 'Unknown error');
       }
-
-      if (customerRes) {
-        if (customerRes.status === 'fulfilled' && !customerRes.value?.error) {
-          customerSent = true;
-          console.log(`✅ [Resend] Customer confirmation dispatched to ${customerOptions.to} (ID: ${customerRes.value?.data?.id || 'ok'})`);
-        } else {
-          console.warn(`⚠️ [Resend] Customer email notice:`, customerRes.value?.error?.message || customerRes.reason?.message || customerRes.reason);
-        }
-      }
-
-      if (adminSent) {
-        return {
-          success: true,
-          method: 'resend',
-          adminSent,
-          customerSent: customerOptions ? customerSent : true
-        };
-      }
-    } catch (resendError) {
-      console.warn('⚠️ [Resend] Error during dual dispatch:', resendError.message);
+    } catch (err) {
+      console.warn(`⚠️ [Resend] Admin send exception:`, err.message);
     }
   }
 
-  // 2. Fallback Attempt: Nodemailer SMTP
-  if (mailTransporter) {
+  // If Admin not sent via Resend, fallback to SMTP
+  if (!adminSent && mailTransporter) {
     try {
-      const promises = [mailTransporter.sendMail(adminOptions)];
-      if (customerOptions && customerOptions.to && customerOptions.to !== adminOptions.to) {
-        promises.push(mailTransporter.sendMail(customerOptions));
-      }
-
-      const results = await Promise.allSettled(promises);
-      const adminResult = results[0];
-      const customerResult = results[1];
-
-      if (adminResult.status === 'fulfilled') {
-        adminSent = true;
-        console.log(`✅ [Nodemailer] Admin notification sent to ${adminOptions.to} (${adminResult.value.messageId})`);
-      } else {
-        console.error(`❌ [Nodemailer] Failed to send admin email:`, adminResult.reason?.message || adminResult.reason);
-      }
-
-      if (customerResult) {
-        if (customerResult.status === 'fulfilled') {
-          customerSent = true;
-          console.log(`✅ [Nodemailer] Customer confirmation sent to ${customerOptions.to} (${customerResult.value.messageId})`);
-        } else {
-          console.warn(`⚠️ [Nodemailer] Customer confirmation failed:`, customerResult.reason?.message || customerResult.reason);
-        }
-      }
-
-      return {
-        success: adminResult.status === 'fulfilled',
-        method: 'smtp',
-        adminSent,
-        customerSent: customerResult ? customerResult.status === 'fulfilled' : true
-      };
+      const info = await mailTransporter.sendMail(adminOptions);
+      adminSent = true;
+      console.log(`✅ [Nodemailer] Admin notification sent via SMTP to ${adminOptions.to} (${info.messageId})`);
     } catch (smtpErr) {
-      console.warn('⚠️ [Nodemailer] SMTP exception:', smtpErr.message);
+      console.error(`❌ [Nodemailer] Admin SMTP error:`, smtpErr.message);
     }
   }
 
-  return { success: false, error: 'No email service succeeded' };
+  // ── 2. Dispatch Customer Confirmation ────────────────────────────────────────
+  if (customerOptions && customerOptions.to && customerOptions.to !== adminOptions.to) {
+    // A. First try Resend (succeeds if custom domain verified or account email)
+    if (resendClient) {
+      try {
+        const custRes = await sendViaResend(customerOptions);
+        if (custRes && !custRes.error) {
+          customerSent = true;
+          console.log(`✅ [Resend] Customer confirmation sent to ${customerOptions.to} (ID: ${custRes.data?.id || 'ok'})`);
+        } else {
+          console.log(`ℹ️ [Resend] Customer domain not yet verified in Resend. Falling back to Gmail SMTP for customer...`);
+        }
+      } catch (err) {
+        console.log(`ℹ️ [Resend] Customer send notice: ${err.message}. Routing to Gmail SMTP...`);
+      }
+    }
+
+    // B. If Resend cannot send to external customer (onboarding@resend.dev restriction), send via Gmail SMTP!
+    if (!customerSent && mailTransporter) {
+      try {
+        const custInfo = await mailTransporter.sendMail(customerOptions);
+        customerSent = true;
+        console.log(`✅ [Nodemailer] Customer confirmation sent via Gmail SMTP to ${customerOptions.to} (${custInfo.messageId})`);
+      } catch (smtpErr) {
+        console.warn(`⚠️ [Nodemailer] Customer SMTP error:`, smtpErr.message);
+      }
+    }
+  }
+
+  return {
+    success: adminSent || customerSent,
+    adminSent,
+    customerSent: customerOptions ? customerSent : true
+  };
 }
 
 // Try to load multer (for file uploads)
