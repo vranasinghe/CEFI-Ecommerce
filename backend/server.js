@@ -187,6 +187,37 @@ const localSubscribers = [];
 const localQuotes = [];
 const localOrders = [];
 
+// ── Email Diagnostic Test Endpoint ───────────────────────────────────────────
+app.get('/api/test-email', async (req, res) => {
+  const targetEmail = req.query.to || process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
+  console.log(`🧪 Diagnostic Test Email requested for: ${targetEmail}`);
+
+  const testAdminOptions = {
+    to: targetEmail,
+    subject: `🧪 CEFI Email System Test (${new Date().toLocaleTimeString()})`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+        <h2 style="color: #1F532E;">✅ CEFI Email Service is Working!</h2>
+        <p>This is a live test email sent from your deployed CEFI Ecommerce system on Vercel.</p>
+        <p><strong>Environment:</strong> Vercel Serverless Function</p>
+        <p><strong>Timestamp:</strong> ${new Date().toISOString()}</p>
+      </div>
+    `,
+    text: `CEFI Email Service is Working! Sent at ${new Date().toISOString()}`
+  };
+
+  const dispatchResult = await sendDualEmails(testAdminOptions, null);
+  return res.json({
+    success: dispatchResult.success,
+    method: dispatchResult.method,
+    targetEmail,
+    resendConfigured: Boolean(resendClient),
+    smtpConfigured: Boolean(mailTransporter),
+    resendFrom: RESEND_FROM_EMAIL,
+    dispatchResult
+  });
+});
+
 // ── Health Check ─────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.json({
