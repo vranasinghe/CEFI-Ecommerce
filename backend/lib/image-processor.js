@@ -20,7 +20,7 @@ async function processImage(inputBuffer, mimeType, purpose) {
       (metadata.height && metadata.height > maxDimension)
     ) {
       throw new Error(
-        \`Image dimensions \${metadata.width}x\${metadata.height} exceed maximum \${maxDimension}\`
+        `Image dimensions ${metadata.width}x${metadata.height} exceed maximum ${maxDimension}`
       );
     }
   }
@@ -37,7 +37,7 @@ async function processImage(inputBuffer, mimeType, purpose) {
       // convert GIF to PNG for safety
       return processPng(pipeline, purpose);
     default:
-      throw new Error(\`Unsupported image type: \${mimeType}\`);
+      throw new Error(`Unsupported image type: ${mimeType}`);
   }
 }
 

@@ -108,7 +108,7 @@ function validateFile(buffer, declaredMimeType, purpose) {
   const maxSize = MAX_FILE_SIZES[purpose] || MAX_FILE_SIZES.attachment;
   if (buffer.length > maxSize) {
     errors.push(
-      \`File size \${buffer.length} exceeds maximum \${maxSize} bytes\`
+      `File size ${buffer.length} exceeds maximum ${maxSize} bytes`
     );
   }
 
@@ -116,7 +116,7 @@ function validateFile(buffer, declaredMimeType, purpose) {
   const allowedTypes = ALLOWED_MIME_TYPES[purpose] || ALLOWED_MIME_TYPES.attachment;
   if (!allowedTypes.includes(declaredMimeType)) {
     errors.push(
-      \`MIME type '\${declaredMimeType}' is not allowed for \${purpose} uploads\`
+      `MIME type '${declaredMimeType}' is not allowed for ${purpose} uploads`
     );
   }
 
@@ -132,7 +132,7 @@ function validateFile(buffer, declaredMimeType, purpose) {
   // 4. Cross-validation: declared MIME must match detected MIME
   if (detectedMimeType && detectedMimeType !== declaredMimeType) {
     errors.push(
-      \`Content-Type mismatch: header says '\${declaredMimeType}' but file content is '\${detectedMimeType}'\`
+      `Content-Type mismatch: header says '${declaredMimeType}' but file content is '${detectedMimeType}'`
     );
   }
 
@@ -159,7 +159,7 @@ function sanitizeFilename(detectedMimeType) {
 
   // Generate random filename
   const randomName = crypto.randomUUID();
-  const safeFilename = \`\${randomName}\${extension}\`;
+  const safeFilename = `${randomName}${extension}`;
 
   return { safeFilename, extension };
 }
