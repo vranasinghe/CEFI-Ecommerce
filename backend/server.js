@@ -156,7 +156,11 @@ const PORT = process.env.PORT || 5000;
 
 // ── Setup uploads directory ──────────────────────────────────────────────────
 const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
+try {
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+} catch (e) {
+  console.warn('⚠️ Could not create uploads directory (read-only filesystem):', e.message);
+}
 
 // ── Middleware ───────────────────────────────────────────────────────────────
 // Security Headers
