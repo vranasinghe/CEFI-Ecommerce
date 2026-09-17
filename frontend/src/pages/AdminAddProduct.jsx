@@ -25,7 +25,7 @@ export default function AdminAddProduct() {
 
   // Fetch categories on mount
   useEffect(() => {
-    fetch('http://localhost:5000/api/categories')
+    fetch('/api/categories')
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -67,7 +67,7 @@ export default function AdminAddProduct() {
     };
 
     try {
-      const response = await fetch('http://localhost:5000/api/products', {
+      const response = await fetch('/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
