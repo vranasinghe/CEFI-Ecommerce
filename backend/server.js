@@ -174,8 +174,8 @@ app.use(limiter);
 
 // HIGH FIX: Tight CORS — only allow known frontend origins
 const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  process.env.FRONTEND_URL_WWW,
+  process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/\/$/, '') : null,
+  process.env.FRONTEND_URL_WWW ? process.env.FRONTEND_URL_WWW.replace(/\/$/, '') : null,
   process.env.NODE_ENV !== 'production' ? 'http://localhost:3000' : null,
   process.env.NODE_ENV !== 'production' ? 'http://localhost:5173' : null,
 ].filter(Boolean);
