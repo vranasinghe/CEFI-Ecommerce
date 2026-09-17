@@ -155,14 +155,8 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ── Setup uploads directory ──────────────────────────────────────────────────
-const uploadsDir = process.env.VERCEL ? path.join('/tmp', 'uploads') : path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  try {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-  } catch (err) {
-    console.warn("Could not create uploads dir:", err.message);
-  }
-}
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
 
 // ── Middleware ───────────────────────────────────────────────────────────────
 // Security Headers
@@ -188,6 +182,11 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
+    // If no origins configured (FRONTEND_URL missing), allow all — open until env vars set
+    if (allowedOrigins.length === 0) {
+      callback(null, true);
+      return;
+    }
     // Allow server-to-server (no origin) and whitelisted origins
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
@@ -202,6 +201,23 @@ app.use(cors({
 app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 app.use('/uploads', express.static(uploadsDir));
+
+// ── Debug / Health Check (safe — no secrets exposed) ────────────────────────
+app.get('/api/debug', (req, res) => {
+  res.json({
+    status: 'ok',
+    supabaseConnected: !!supabase,
+    envVars: {
+      SUPABASE_URL: process.env.SUPABASE_URL ? '✅ set' : '❌ missing',
+      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? '✅ set' : '❌ missing',
+      SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY ? '✅ set' : '❌ missing',
+      FRONTEND_URL: process.env.FRONTEND_URL || '❌ missing',
+      FRONTEND_URL_WWW: process.env.FRONTEND_URL_WWW || '❌ missing',
+      NODE_ENV: process.env.NODE_ENV || 'not set',
+    },
+    allowedOrigins,
+  });
+});
 
 // ── Multer storage config ────────────────────────────────────────────────────
 let upload = null;
@@ -404,12 +420,19 @@ app.get('/api/products', async (req, res) => {
   const { category, search, sort, featured, wholesale } = req.query;
   try {
     let list = [...mockData.products];
+    let source = 'mockData';
     if (supabase) {
       const { data, error } = await supabase.from('products').select('*');
-      if (!error && data && data.length > 0) {
+      if (error) {
+        console.error('❌ Supabase products fetch error:', error.message);
+      } else if (data && data.length > 0) {
         list = data;
+        source = 'supabase';
+      } else {
+        console.warn('⚠️ Supabase returned 0 products — check RLS policies or table data.');
       }
     }
+    console.log(`📦 GET /api/products — source: ${source}, count: ${list.length}`);
     if (category && category !== 'all') list = list.filter(p => (p.category_slug || '').toLowerCase() === category.toLowerCase());
     if (search) {
       const q = search.toLowerCase();
@@ -422,6 +445,7 @@ app.get('/api/products', async (req, res) => {
     else if (sort === 'name') list.sort((a, b) => a.name.localeCompare(b.name));
     return res.json(list);
   } catch (err) {
+    console.error('❌ /api/products crash:', err.message);
     return res.json(mockData.products);
   }
 });
