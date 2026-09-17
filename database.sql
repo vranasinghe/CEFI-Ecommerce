@@ -39,8 +39,13 @@ INSERT INTO categories (name, slug, description) VALUES
 -- Create storage bucket for images (if you haven't created it manually)
 INSERT INTO storage.buckets (id, name, public) VALUES ('product-images', 'product-images', true) ON CONFLICT DO NOTHING;
 
--- Allow public access to product-images bucket
+-- Security: Enable Row Level Security (RLS) on storage.objects
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+-- Allow public read access to product-images bucket
 CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING ( bucket_id = 'product-images' );
-CREATE POLICY "Public Upload" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'product-images' );
-CREATE POLICY "Public Update" ON storage.objects FOR UPDATE USING ( bucket_id = 'product-images' );
-CREATE POLICY "Public Delete" ON storage.objects FOR DELETE USING ( bucket_id = 'product-images' );
+
+-- RESTRICT: Only authenticated users (or the service role/admin) can upload, update, delete
+CREATE POLICY "Authenticated Upload" ON storage.objects FOR INSERT TO authenticated WITH CHECK ( bucket_id = 'product-images' );
+CREATE POLICY "Authenticated Update" ON storage.objects FOR UPDATE TO authenticated USING ( bucket_id = 'product-images' );
+CREATE POLICY "Authenticated Delete" ON storage.objects FOR DELETE TO authenticated USING ( bucket_id = 'product-images' );

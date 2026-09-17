@@ -4,12 +4,22 @@ const path = require('path');
 const fs = require('fs');
 const nodemailer = require('nodemailer');
 const { Resend } = require('resend');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const cookieParser = require('cookie-parser');
+const { requireAuth } = require('./middleware/auth');
+const { sanitizeText, sanitizeHtml, sanitizeHeader, isValidEmail, isValidString } = require('./lib/sanitize');
 require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
 
-const EMAIL_USER = process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
-const EMAIL_PASS = process.env.EMAIL_PASS || 'hlgjksvsobiresqc';
+// ── CRITICAL SECURITY: No hardcoded credentials. Fail loudly if env vars missing.
+const EMAIL_USER = process.env.EMAIL_USER;
+const EMAIL_PASS = process.env.EMAIL_PASS;
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'CEFI Notifications <onboarding@resend.dev>';
+
+if (!EMAIL_USER || !EMAIL_PASS) {
+  console.warn('⚠️  SECURITY WARNING: EMAIL_USER or EMAIL_PASS not set in environment. Email via SMTP is disabled.');
+}
 
 // ── Initialize Resend Client ──────────────────────────────────────────────────
 let resendClient = null;
@@ -149,8 +159,42 @@ const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
 
 // ── Middleware ───────────────────────────────────────────────────────────────
-app.use(cors());
-app.use(express.json());
+// Security Headers
+app.use(helmet());
+app.use(helmet.crossOriginResourcePolicy({ policy: "cross-origin" }));
+
+// Rate Limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(limiter);
+
+// HIGH FIX: Tight CORS — only allow known frontend origins
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.FRONTEND_URL_WWW,
+  process.env.NODE_ENV !== 'production' ? 'http://localhost:3000' : null,
+  process.env.NODE_ENV !== 'production' ? 'http://localhost:5173' : null,
+].filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow server-to-server (no origin) and whitelisted origins
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS policy: origin '${origin}' is not allowed`));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+}));
+app.use(express.json({ limit: '2mb' }));
+app.use(cookieParser());
 app.use('/uploads', express.static(uploadsDir));
 
 // ── Multer storage config ────────────────────────────────────────────────────
@@ -161,13 +205,20 @@ if (multer) {
 }
 
 // ── In-memory fallback stores ────────────────────────────────────────────────
+const MAX_LOCAL_STORE = 500;
+function pushBounded(arr, item) {
+  arr.unshift(item);
+  if (arr.length > MAX_LOCAL_STORE) arr.pop();
+}
+
 const localContactMessages = [];
 const localSubscribers = [];
 const localQuotes = [];
 const localOrders = [];
 
 // ── Email Diagnostic Test Endpoint ───────────────────────────────────────────
-app.get('/api/test-email', async (req, res) => {
+// CRITICAL FIX: requireAuth added — prevents spam relay abuse
+app.get('/api/test-email', requireAuth, async (req, res) => {
   const targetEmail = req.query.to || process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
   console.log(`🧪 Diagnostic Test Email requested for: ${targetEmail}`);
 
@@ -314,7 +365,7 @@ app.get('/api/catalog-profile', (req, res) => {
   return res.json(currentCatalogProfile || defaultCatalogProfile);
 });
 
-app.post('/api/catalog-profile', (req, res) => {
+app.post('/api/catalog-profile', requireAuth, (req, res) => {
   try {
     const updated = req.body;
     if (!updated || typeof updated !== 'object') {
@@ -328,7 +379,7 @@ app.post('/api/catalog-profile', (req, res) => {
   }
 });
 
-app.put('/api/catalog-profile', (req, res) => {
+app.put('/api/catalog-profile', requireAuth, (req, res) => {
   try {
     const updated = req.body;
     if (!updated || typeof updated !== 'object') {
@@ -388,23 +439,27 @@ app.get('/api/products/:slug', async (req, res) => {
 });
 
 // ── Products: POST (Add new) ──────────────────────────────────────────────────
-app.post('/api/products', async (req, res) => {
+// CRITICAL FIX: All product write endpoints now require authentication
+app.post('/api/products', requireAuth, async (req, res) => {
   const { name, slug, price, short_description, full_description, images, category_slug, is_wholesale_only, is_featured, variants } = req.body;
   if (!name || !slug || !category_slug) {
     return res.status(400).json({ success: false, message: 'Missing required fields.' });
   }
   const category = mockData.categories.find(c => c.slug === category_slug);
+
+  // XSS FIX: Sanitize all text fields before storage
   const payload = {
-    name, slug,
-    price: parseFloat(price) || 0,
-    short_description: short_description || '',
-    full_description: full_description || '',
-    images: images && images.length > 0 ? images : [],
+    name:              sanitizeText(name, 300),
+    slug:              sanitizeText(slug, 200).toLowerCase(),
+    price:             parseFloat(price) || 0,
+    short_description: sanitizeText(short_description || '', 1000),
+    full_description:  sanitizeHtml(full_description || ''),
+    images:            images && images.length > 0 ? images : [],
     category_slug,
-    category_name: category ? category.name : category_slug,
+    category_name:     category ? category.name : category_slug,
     is_wholesale_only: Boolean(is_wholesale_only),
-    is_featured: Boolean(is_featured),
-    variants: variants || null
+    is_featured:       Boolean(is_featured),
+    variants:          variants || null
   };
   try {
     if (supabase) {
@@ -413,22 +468,30 @@ app.post('/api/products', async (req, res) => {
         console.error('Supabase insert error:', error.message);
         return res.status(500).json({ success: false, message: error.message });
       }
-      console.log('📦 Product Added to Supabase:', payload.name);
+      if (process.env.NODE_ENV !== 'production') console.log('📦 Product Added to Supabase:', payload.name);
       return res.json({ success: true, message: 'Product added!', product: data[0] });
     }
   } catch (err) { console.error(err); }
 
-  // Fallback for mock data if no Supabase
-  payload.id = `prod-${Date.now()}`;
+  // Fallback for mock data — crypto-secure ID
+  const crypto = require('crypto');
+  payload.id = `prod-${crypto.randomUUID()}`;
   mockData.products.push(payload);
-  console.log('📦 Product Added:', payload.name);
   return res.json({ success: true, message: 'Product added!', product: payload });
 });
 
-app.put('/api/products/:id', async (req, res) => {
+app.put('/api/products/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
   const updates = { ...req.body };
   delete updates.id; // don't update ID
+
+  // XSS FIX: Sanitize text fields before writing to DB
+  if (updates.name)              updates.name              = sanitizeText(updates.name, 300);
+  if (updates.slug)              updates.slug              = sanitizeText(updates.slug, 200).toLowerCase();
+  if (updates.short_description) updates.short_description = sanitizeText(updates.short_description, 1000);
+  if (updates.full_description)  updates.full_description  = sanitizeHtml(updates.full_description);
+  if (updates.origin)            updates.origin            = sanitizeText(updates.origin, 200);
+  if (updates.weight)            updates.weight            = sanitizeText(updates.weight, 100);
 
   // Only send columns that exist in the Supabase products table
   const ALLOWED_COLUMNS = ['name', 'slug', 'price', 'short_description', 'full_description',
@@ -485,7 +548,7 @@ app.put('/api/products/:id', async (req, res) => {
 });
 
 // ── Products: DELETE ──────────────────────────────────────────────────────────
-app.delete('/api/products/:id', async (req, res) => {
+app.delete('/api/products/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -515,8 +578,12 @@ app.delete('/api/products/:id', async (req, res) => {
   return res.json({ success: true, message: 'Product deleted!' });
 });
 
-// ── Image Upload ──────────────────────────────────────────────────────────────
-app.post('/api/upload', (req, res) => {
+// ── Secure Image Upload ────────────────────────────────────────────────────────
+const { validateFile, sanitizeFilename } = require('./lib/magic-bytes');
+const { processImage } = require('./lib/image-processor');
+
+// MEDIUM FIX: requireAuth prevents storage quota exhaustion by anonymous users
+app.post('/api/upload', requireAuth, (req, res) => {
   if (!upload) {
     return res.status(500).json({ success: false, message: 'Image upload not available. Run: npm install multer in the backend folder.' });
   }
@@ -525,17 +592,38 @@ app.post('/api/upload', (req, res) => {
     if (!req.files || req.files.length === 0) return res.status(400).json({ success: false, message: 'No files uploaded.' });
     
     try {
-      if (supabase) {
-        const urls = [];
-        for (const file of req.files) {
-          const fileExt = path.extname(file.originalname);
-          const fileName = `${Date.now()}-${Math.round(Math.random() * 1e5)}${fileExt}`;
-          
-          const { data, error } = await supabase.storage
+      const urls = [];
+      const isProduct = req.body.purpose === 'product' || !req.body.purpose;
+      const purpose = isProduct ? 'product' : 'attachment';
+
+      for (const file of req.files) {
+        // 1. Magic byte & size validation
+        const validation = validateFile(file.buffer, file.mimetype, purpose);
+        
+        if (!validation.isValid) {
+          return res.status(400).json({ 
+            success: false, 
+            message: 'File validation failed', 
+            errors: validation.errors 
+          });
+        }
+
+        // 2. Re-encode and sanitize with Sharp
+        const processed = await processImage(
+          file.buffer, 
+          validation.detectedMimeType, 
+          purpose
+        );
+
+        // 3. Sanitize filename
+        const { safeFilename } = sanitizeFilename(processed.mimeType);
+
+        if (supabase) {
+          const { error } = await supabase.storage
             .from('product-images')
-            .upload(fileName, file.buffer, {
-              contentType: file.mimetype,
-              cacheControl: '3600',
+            .upload(safeFilename, processed.buffer, {
+              contentType: processed.mimeType,
+              cacheControl: '31536000',
               upsert: false
             });
             
@@ -543,19 +631,20 @@ app.post('/api/upload', (req, res) => {
           
           const { data: publicData } = supabase.storage
             .from('product-images')
-            .getPublicUrl(fileName);
+            .getPublicUrl(safeFilename);
             
           urls.push(publicData.publicUrl);
+        } else {
+          // Fallback if no supabase
+          const localPath = path.join(uploadsDir, safeFilename);
+          fs.writeFileSync(localPath, processed.buffer);
+          urls.push(`http://localhost:${PORT}/uploads/${safeFilename}`);
         }
-        return res.json({ success: true, urls });
       }
-      
-      // Fallback if no supabase
-      const urls = req.files.map(f => `http://localhost:${PORT}/uploads/${f.originalname}`);
       return res.json({ success: true, urls });
     } catch (uploadError) {
-      console.error('Supabase upload error:', uploadError);
-      return res.status(500).json({ success: false, message: 'Failed to upload to Supabase' });
+      console.error('Secure upload error:', uploadError);
+      return res.status(500).json({ success: false, message: 'Failed to process and upload files safely.' });
     }
   });
 });
@@ -615,7 +704,8 @@ app.get('/api/blog/:slug', async (req, res) => {
 });
 
 // ── Blog: POST (Create New Article) ──────────────────────────────────────────
-app.post('/api/blog', async (req, res) => {
+// CRITICAL FIX: All blog write endpoints now require authentication
+app.post('/api/blog', requireAuth, async (req, res) => {
   const { title, slug, cover_image, excerpt, content, author, category, read_time_min } = req.body;
   if (!title || !content) {
     return res.status(400).json({ success: false, message: 'Title and content are required.' });
@@ -628,17 +718,18 @@ app.post('/api/blog', async (req, res) => {
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-');
 
+  // HIGH FIX: Sanitize all user-supplied strings to prevent Stored XSS
   const newPost = {
     id: `blog-${Date.now()}`,
-    title,
-    slug: generatedSlug,
-    category: category || 'Trade & Insights',
-    cover_image: cover_image || 'https://images.unsplash.com/photo-1597481499750-3e6b22637e12?auto=format&fit=crop&w=800&q=80',
-    excerpt: excerpt || (content.length > 160 ? content.substring(0, 160) + '...' : content),
-    content,
-    author: author || 'CEFI Editorial Team',
-    read_time_min: parseInt(read_time_min, 10) || 5,
-    published_at: new Date().toISOString()
+    title:          sanitizeText(title, 300),
+    slug:           generatedSlug,
+    category:       sanitizeText(category || 'Trade & Insights', 100),
+    cover_image:    sanitizeText(cover_image || 'https://images.unsplash.com/photo-1597481499750-3e6b22637e12?auto=format&fit=crop&w=800&q=80', 500),
+    excerpt:        sanitizeText(excerpt || content.substring(0, 160), 500),
+    content:        sanitizeHtml(content),
+    author:         sanitizeText(author || 'CEFI Editorial Team', 100),
+    read_time_min:  parseInt(read_time_min, 10) || 5,
+    published_at:   new Date().toISOString()
   };
 
   try {
@@ -658,7 +749,7 @@ app.post('/api/blog', async (req, res) => {
 });
 
 // ── Blog: PUT (Update Article) ────────────────────────────────────────────────
-app.put('/api/blog/:id', async (req, res) => {
+app.put('/api/blog/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
   const { title, slug, cover_image, excerpt, content, author, category, read_time_min } = req.body;
 
@@ -668,17 +759,18 @@ app.put('/api/blog/:id', async (req, res) => {
     return res.status(404).json({ success: false, message: 'Article not found.' });
   }
 
+  // XSS FIX: Sanitize all fields before storage
   const updatedPost = {
     ...currentBlogs[index],
-    title: title !== undefined ? title : currentBlogs[index].title,
-    slug: slug !== undefined ? slug : currentBlogs[index].slug,
-    category: category !== undefined ? category : currentBlogs[index].category,
-    cover_image: cover_image !== undefined ? cover_image : currentBlogs[index].cover_image,
-    excerpt: excerpt !== undefined ? excerpt : currentBlogs[index].excerpt,
-    content: content !== undefined ? content : currentBlogs[index].content,
-    author: author !== undefined ? author : currentBlogs[index].author,
+    title:        title        !== undefined ? sanitizeText(title, 300)        : currentBlogs[index].title,
+    slug:         slug         !== undefined ? slug                            : currentBlogs[index].slug,
+    category:     category     !== undefined ? sanitizeText(category, 100)    : currentBlogs[index].category,
+    cover_image:  cover_image  !== undefined ? sanitizeText(cover_image, 500) : currentBlogs[index].cover_image,
+    excerpt:      excerpt      !== undefined ? sanitizeText(excerpt, 500)      : currentBlogs[index].excerpt,
+    content:      content      !== undefined ? sanitizeHtml(content)           : currentBlogs[index].content,
+    author:       author       !== undefined ? sanitizeText(author, 100)       : currentBlogs[index].author,
     read_time_min: read_time_min !== undefined ? (parseInt(read_time_min, 10) || 5) : currentBlogs[index].read_time_min,
-    updated_at: new Date().toISOString()
+    updated_at:   new Date().toISOString()
   };
 
   try {
@@ -697,7 +789,7 @@ app.put('/api/blog/:id', async (req, res) => {
 });
 
 // ── Blog: DELETE Article ──────────────────────────────────────────────────────
-app.delete('/api/blog/:id', async (req, res) => {
+app.delete('/api/blog/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
   const currentBlogs = getStoredBlogs();
   const filtered = currentBlogs.filter(b => b.id !== id && b.slug !== id);
@@ -828,25 +920,34 @@ ${message}
 // ── Contact Route (POST /api/contact) ─────────────────────────────────────────
 app.post('/api/contact', async (req, res) => {
   const { name, email, phone, subject, message } = req.body;
-  if (!name || !email || !message) {
-    return res.status(400).json({ success: false, message: 'Name, email, and message are required.' });
+
+  // MEDIUM FIX: Strict input validation with email format check and length caps
+  if (!name || !isValidString(name, 200)) {
+    return res.status(400).json({ success: false, message: 'A valid name is required (max 200 chars).' });
+  }
+  if (!email || !isValidEmail(email)) {
+    return res.status(400).json({ success: false, message: 'A valid email address is required.' });
+  }
+  if (!message || !isValidString(message, 5000)) {
+    return res.status(400).json({ success: false, message: 'A message is required (max 5000 characters).' });
   }
 
   const record = {
-    name,
-    email,
-    phone: phone || '',
-    subject: subject || 'General Inquiry',
-    message,
+    name:    sanitizeText(name, 200),
+    email:   email.trim().toLowerCase(),
+    phone:   sanitizeText(phone || '', 30),
+    subject: sanitizeText(subject || 'General Inquiry', 300),
+    message: sanitizeText(message, 5000),
     createdAt: new Date().toISOString()
   };
 
-  console.log(`📬 New Contact Message Received from ${name} (${email})`);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`📬 New Contact Message from ${record.name}`);
+  }
   const dispatchResult = await sendContactEmail(record);
   return res.json({
     success: true,
     message: 'Your message has been sent to Ceylon Eco Fresh Infinity!',
-    targetEmail: process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com',
     dispatch: dispatchResult
   });
 });
@@ -935,12 +1036,16 @@ async function sendNewsletterEmail(email) {
 
 app.post('/api/newsletter', async (req, res) => {
   const { email } = req.body;
-  if (!email) {
-    return res.status(400).json({ success: false, message: 'Email is required.' });
+
+  // MEDIUM FIX: Email format validation
+  if (!email || !isValidEmail(email)) {
+    return res.status(400).json({ success: false, message: 'A valid email address is required.' });
   }
 
-  console.log(`📬 New Newsletter Subscriber: ${email}`);
-  const dispatchResult = await sendNewsletterEmail(email);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`📬 New Newsletter Subscriber`);
+  }
+  const dispatchResult = await sendNewsletterEmail(email.trim().toLowerCase());
   return res.json({
     success: true,
     message: 'Successfully subscribed to the newsletter!',
@@ -1071,43 +1176,45 @@ ${notes}
 // ── Quote Route (POST /api/quotes) ───────────────────────────────────────────
 app.post('/api/quotes', async (req, res) => {
   const { name, company, email, phone, product, quantity, targetDestination, destinationPort, notes, message } = req.body;
-  if (!name || !email || !product) {
-    return res.status(400).json({ success: false, message: 'Name, email, and product are required.' });
+
+  // MEDIUM FIX: Strict validation on all quote fields
+  if (!name || !isValidString(name, 200)) {
+    return res.status(400).json({ success: false, message: 'A valid name is required.' });
+  }
+  if (!email || !isValidEmail(email)) {
+    return res.status(400).json({ success: false, message: 'A valid email address is required.' });
+  }
+  if (!product || !isValidString(product, 300)) {
+    return res.status(400).json({ success: false, message: 'A valid product name is required.' });
   }
 
   const record = {
-    name,
-    company: company || 'Direct Buyer',
-    email,
-    phone: phone || '',
-    product,
-    quantity: quantity || 'Sample Request',
-    targetDestination: targetDestination || destinationPort || 'Worldwide',
-    notes: notes || message || '',
-    createdAt: new Date().toISOString()
+    name:              sanitizeText(name, 200),
+    company:           sanitizeText(company || 'Direct Buyer', 200),
+    email:             email.trim().toLowerCase(),
+    phone:             sanitizeText(phone || '', 30),
+    product:           sanitizeText(product, 300),
+    quantity:          sanitizeText(quantity || 'Sample Request', 100),
+    targetDestination: sanitizeText(targetDestination || destinationPort || 'Worldwide', 200),
+    notes:             sanitizeText(notes || message || '', 3000),
+    createdAt:         new Date().toISOString()
   };
 
-  console.log(`📋 New Quote Request Received for ${product} from ${name} (${company})`);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`📋 New Quote Request for product from client`);
+  }
   const dispatchResult = await sendQuoteEmail(record);
   return res.json({
     success: true,
     message: 'Your quote request has been submitted to Ceylon Eco Fresh Infinity!',
-    targetEmail: process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com',
     dispatch: dispatchResult
   });
 });
 
-// ── Newsletter Route (POST /api/newsletter) ───────────────────────────────────
-app.post('/api/newsletter', async (req, res) => {
-  const { email } = req.body;
-  if (!email) {
-    return res.status(400).json({ success: false, message: 'Email address is required.' });
-  }
-  console.log(`📰 Newsletter Subscription: ${email}`);
-  return res.json({ success: true, message: 'Thank you for subscribing to Ceylon Eco Fresh Infinity updates!' });
-});
+// Dead code removed — duplicate /api/newsletter route deleted (security cleanup)
 
-app.get('/api/orders', (req, res) => {
+// MEDIUM FIX: requireAuth prevents public PII exposure of all customer orders
+app.get('/api/orders', requireAuth, (req, res) => {
   return res.json(localOrders);
 });
 
@@ -1264,13 +1371,20 @@ async function sendOrderEmail(orderRecord) {
 }
 
 app.post('/api/orders', async (req, res) => {
-  const { customer, items, paymentMethod, targetEmail } = req.body;
+  // MEDIUM FIX: Remove attacker-controlled targetEmail from req.body
+  const { customer, items, paymentMethod } = req.body;
   if (!customer || !items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ success: false, message: 'Invalid order data: customer details and items are required.' });
   }
 
-  const orderId = `CEFI-ORD-${Math.floor(100000 + Math.random() * 900000)}`;
-  const destinationEmail = targetEmail || 'ceylonecofreshinfinity@gmail.com';
+  // LOW FIX: Crypto-secure order ID (not Math.random)
+  const crypto = require('crypto');
+  const orderId = `CEFI-ORD-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+
+  // MEDIUM FIX: Always use server-side admin email — never trust client-supplied destination
+  const destinationEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
+
+  // MEDIUM FIX: Bounded array — cap in-memory store to prevent DoS
   const orderRecord = {
     orderId,
     customer,
@@ -1280,13 +1394,15 @@ app.post('/api/orders', async (req, res) => {
     status: 'Confirmed',
     createdAt: new Date().toISOString()
   };
-  localOrders.unshift(orderRecord);
-  console.log(`🛒 New Order Received [${orderId}] with ${items.length} items from ${customer.name}`);
+  pushBounded(localOrders, orderRecord);
 
-  // Trigger Email Dispatch to ceylonecofreshinfinity@gmail.com
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`🛒 New Order [${orderId}] with ${items.length} items`);
+  }
+
   sendOrderEmail(orderRecord).catch(err => console.error('Email send error:', err));
 
-  return res.json({ success: true, orderId, targetEmail: destinationEmail, message: 'Order placed & email notification dispatched successfully!' });
+  return res.json({ success: true, orderId, message: 'Order placed & email notification dispatched successfully!' });
 });
 
 // ── Start Server ──────────────────────────────────────────────────────────────
