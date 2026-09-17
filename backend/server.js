@@ -155,8 +155,14 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ── Setup uploads directory ──────────────────────────────────────────────────
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
+const uploadsDir = process.env.VERCEL ? path.join('/tmp', 'uploads') : path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  try {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  } catch (err) {
+    console.warn("Could not create uploads dir:", err.message);
+  }
+}
 
 // ── Middleware ───────────────────────────────────────────────────────────────
 // Security Headers
