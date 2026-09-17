@@ -1,10 +1,16 @@
-const sharp = require('sharp');
+let sharp;
+try {
+  sharp = require('sharp');
+} catch (e) {
+  sharp = null;
+}
 
 /**
  * Process an uploaded image through Sharp.
  * Re-encodes the image, strips EXIF metadata, removes polyglots.
  */
 async function processImage(inputBuffer, mimeType, purpose) {
+  if (!sharp) throw new Error('Image processing is not available in this environment.');
   const pipeline = sharp(inputBuffer, {
     failOn: 'none',           // Don't fail on warnings
     sequentialRead: true,     // Optimize for memory

@@ -608,9 +608,14 @@ app.delete('/api/products/:id', requireAuth, async (req, res) => {
   return res.json({ success: true, message: 'Product deleted!' });
 });
 
-// ── Secure Image Upload ────────────────────────────────────────────────────────
-const { validateFile, sanitizeFilename } = require('./lib/magic-bytes');
-const { processImage } = require('./lib/image-processor');
+// Secure upload libs (sharp may not be available in all environments)
+let validateFile, sanitizeFilename, processImage;
+try {
+  ({ validateFile, sanitizeFilename } = require('./lib/magic-bytes'));
+  ({ processImage } = require('./lib/image-processor'));
+} catch (e) {
+  console.warn('⚠️ Image processing libs unavailable (sharp not built for this platform):', e.message);
+}
 
 // MEDIUM FIX: requireAuth prevents storage quota exhaustion by anonymous users
 app.post('/api/upload', requireAuth, (req, res) => {
