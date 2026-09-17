@@ -3,11 +3,22 @@
  * Shared sanitization utilities used across server.js.
  * Covers: XSS (HTML injection), email header injection, email format, string length.
  */
-const createDOMPurify = require('dompurify');
-const { JSDOM } = require('jsdom');
+// jsdom/dompurify can fail to load on some serverless runtimes (e.g. missing
+// native canvas peer on Vercel's Linux Lambda). Guard the require so a failure
+// here degrades to a regex-based fallback instead of crashing the whole function.
+let DOMPurify = null;
+try {
+  const createDOMPurify = require('dompurify');
+  const { JSDOM } = require('jsdom');
+  const window = new JSDOM('').window;
+  DOMPurify = createDOMPurify(window);
+} catch (e) {
+  console.warn('⚠️ Could not initialize DOMPurify/jsdom, falling back to regex sanitization:', e.message);
+}
 
-const window = new JSDOM('').window;
-const DOMPurify = createDOMPurify(window);
+function stripTagsFallback(value) {
+  return value.replace(/<[^>]*>/g, '');
+}
 
 // ── Regex ────────────────────────────────────────────────────────────────────
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -18,7 +29,9 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
  */
 function sanitizeText(value, maxLength = 500) {
   if (typeof value !== 'string') return '';
-  return DOMPurify.sanitize(value.trim().substring(0, maxLength), { ALLOWED_TAGS: [] });
+  const trimmed = value.trim().substring(0, maxLength);
+  if (!DOMPurify) return stripTagsFallback(trimmed);
+  return DOMPurify.sanitize(trimmed, { ALLOWED_TAGS: [] });
 }
 
 /**
@@ -27,6 +40,7 @@ function sanitizeText(value, maxLength = 500) {
  */
 function sanitizeHtml(value, maxLength = 100000) {
   if (typeof value !== 'string') return '';
+  if (!DOMPurify) return stripTagsFallback(value.trim().substring(0, maxLength));
   return DOMPurify.sanitize(value.trim().substring(0, maxLength));
 }
 
