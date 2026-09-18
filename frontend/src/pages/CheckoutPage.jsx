@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { CheckCircle2, Mail, Send, Loader2 } from 'lucide-react';
+import { CheckCircle2, Mail, Send, Loader2, Lock, AlertTriangle } from 'lucide-react';
 import emailjs from '@emailjs/browser';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import LoginPromptModal from '../components/LoginPromptModal';
+import supabase from '../utils/supabase';
 
 const COMPANY_ORDER_EMAIL = 'ceylonecofreshinfinity@gmail.com';
 // Same EmailJS credentials used in ContactPage (already verified working)
@@ -19,7 +20,8 @@ export default function CheckoutPage() {
 
   const [formData, setFormData] = useState({
     name: user?.name || '',
-    email: '',
+    // Always the signed-in account's registered email — the input is read-only.
+    email: user?.email || '',
     phone: '',
     address: '',
     city: 'Colombo',
@@ -32,6 +34,11 @@ export default function CheckoutPage() {
   const [orderConfirmed, setOrderConfirmed] = useState(null);
   const [orderDetails, setOrderDetails] = useState(null);
   const [emailSent, setEmailSent] = useState(false);
+  // Actual recipients confirmed by the backend, so the success panel reports
+  // what was really delivered rather than assuming.
+  const [emailRecipients, setEmailRecipients] = useState({ customer: null, admin: null });
+  const [adminNotified, setAdminNotified] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
 
   const shippingCost = cartTotal > 100 || cartTotal === 0 ? 0 : 15.00;
   const grandTotal = cartTotal + shippingCost;
@@ -41,6 +48,7 @@ export default function CheckoutPage() {
       setFormData(prev => ({
         ...prev,
         name: prev.name || user.name || user.user_metadata?.full_name || '',
+        email: user.email || '',
       }));
     }
   }, [user]);
@@ -48,9 +56,28 @@ export default function CheckoutPage() {
   const handleSubmitOrder = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setSubmitError(null);
+
+    // The backend identifies the buyer from this verified session, not from
+    // the form — so an order can only ever confirm to the account's own email.
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      setSubmitError('Your session has expired. Please sign in again to place your order.');
+      setLoading(false);
+      return;
+    }
 
     const orderId = `CEFI-ORD-${Math.floor(100000 + Math.random() * 900000)}`;
-    let orderSent = false;
+    // Two independent outcomes: the admin alert and the customer confirmation.
+    // The Web3Forms / FormSubmit fallbacks below can only reach the admin, so
+    // collapsing these into one flag is what previously showed a green
+    // "emails sent" panel while the customer received nothing.
+    let adminNotified = false;
+    let customerNotified = false;
+    // True only if the API could not be reached at all. A reachable API that
+    // rejects the order (bad session, unconfirmed email) must NOT fall through
+    // to the admin-only email fallbacks and pretend the order went through.
+    let backendUnreachable = false;
 
     const itemsSummary = cart.map(item => `• ${item.name} (Qty: ${item.quantity}) - $${(item.price * item.quantity).toFixed(2)}`).join('\n');
     const itemsLine = cart.map(item => `${item.name} x${item.quantity}`).join(', ');
@@ -59,29 +86,56 @@ export default function CheckoutPage() {
     try {
       const apiRes = await fetch('/api/orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`
+        },
         body: JSON.stringify({
           orderId, 
-          customer: formData, 
+          customer: { ...formData, email: user.email }, 
           items: cart,
           paymentMethod: formData.paymentMethod || 'Direct Email Order', 
           targetEmail: COMPANY_ORDER_EMAIL
         })
       });
       
+      if (apiRes.status === 401 || apiRes.status === 403) {
+        const errData = await apiRes.json().catch(() => ({}));
+        setSubmitError(
+          errData.code === 'EMAIL_UNCONFIRMED'
+            ? 'Please confirm your email address (check your inbox for the verification link), then place your order.'
+            : 'Please sign in again with your registered account to place your order.'
+        );
+        setLoading(false);
+        return; // order not placed — cart is kept
+      }
+
+      if (apiRes.status >= 500) backendUnreachable = true;
+
       if (apiRes.ok) {
         const apiData = await apiRes.json();
         if (apiData.success) {
-          orderSent = true;
-          console.log('✅ Backend API order confirmation dispatched with gorgeous HTML template!');
+          // The order is saved. Email delivery is reported separately — a saved
+          // order with a failed email must not show a green success panel.
+          const notifications = apiData.notifications || {};
+          adminNotified = Boolean(notifications.adminEmail);
+          customerNotified = Boolean(notifications.customerEmail);
+          setEmailRecipients({
+            customer: notifications.customerEmail || null,
+            admin: notifications.adminEmail || null
+          });
+          if (!customerNotified) {
+            console.warn('Order saved but the customer confirmation failed:', notifications.detail);
+          }
         }
       }
     } catch (error) {
+      backendUnreachable = true;
       console.warn('Backend API order endpoint not reachable, trying Web3Forms fallback...', error);
     }
 
-    // ══ 2. WEB3FORMS FALLBACK (Only triggers if backend API was unavailable) ══
-    if (!orderSent) {
+    // ══ 2. WEB3FORMS FALLBACK (admin notification only, API outage only) ══
+    if (!adminNotified && backendUnreachable) {
       try {
         const w3Res = await fetch('https://api.web3forms.com/submit', {
           method: 'POST',
@@ -106,15 +160,15 @@ export default function CheckoutPage() {
         });
         const w3Data = await w3Res.json();
         if (w3Data.success) {
-          orderSent = true;
+          adminNotified = true; // reaches the company inbox, not the customer
         }
       } catch (w3Err) {
         console.warn('Web3Forms dispatch failed, attempting FormSubmit fallback...', w3Err);
       }
     }
 
-    // ══ 3. FORMSUBMIT FALLBACK ══
-    if (!orderSent) {
+    // ══ 3. FORMSUBMIT FALLBACK (admin notification only, API outage only) ══
+    if (!adminNotified && backendUnreachable) {
       try {
         await fetch(`https://formsubmit.co/ajax/${COMPANY_ORDER_EMAIL}`, {
           method: 'POST',
@@ -130,15 +184,17 @@ export default function CheckoutPage() {
             total: `$${grandTotal.toFixed(2)}`
           })
         });
-        orderSent = true;
+        adminNotified = true; // reaches the company inbox, not the customer
       } catch (fsErr) {
         console.error('All order email delivery options failed:', fsErr);
       }
     }
 
     setOrderConfirmed(orderId);
-    setEmailSent(orderSent);
-    setOrderDetails({ orderId, items: cart, total: grandTotal, customer: formData });
+    // Green panel only when the customer genuinely received their confirmation.
+    setEmailSent(customerNotified);
+    setAdminNotified(adminNotified);
+    setOrderDetails({ orderId, items: cart, total: grandTotal, customer: { ...formData, email: user.email } });
     clearCart();
     setLoading(false);
   };
@@ -192,16 +248,22 @@ export default function CheckoutPage() {
                 <>
                   <strong className="block text-cefi-green font-semibold mb-1">Order emails sent successfully!</strong>
                   <span className="text-gray-600 leading-relaxed">
-                    ✓ Order notification sent to <strong>{COMPANY_ORDER_EMAIL}</strong><br/>
-                    ✓ Confirmation sent to <strong>{orderDetails.customer.email}</strong><br/>
+                    ✓ Order notification sent to <strong>{emailRecipients.admin || COMPANY_ORDER_EMAIL}</strong><br/>
+                    ✓ Confirmation sent to <strong>{emailRecipients.customer || orderDetails.customer.email}</strong><br/>
                     <span className="text-gray-500 text-[11px]">Our export team will contact you within 24 hours to confirm dispatch.</span>
                   </span>
                 </>
               ) : (
                 <>
-                  <strong className="block text-amber-700 font-semibold mb-1">Order recorded — email not sent</strong>
+                  <strong className="block text-amber-700 font-semibold mb-1">
+                    {adminNotified
+                      ? 'Order received — confirmation email could not be delivered'
+                      : 'Order recorded — email not sent'}
+                  </strong>
                   <span className="text-gray-600">
-                    Please contact <strong>{COMPANY_ORDER_EMAIL}</strong> quoting order <strong>{orderConfirmed}</strong> if you don't hear back within 24 hours.
+                    {adminNotified
+                      ? <>Our team has your order and will be in touch, but we could not email your copy to <strong>{orderDetails.customer.email}</strong>. Please save your reference: <strong>{orderConfirmed}</strong>.</>
+                      : <>Please contact <strong>{COMPANY_ORDER_EMAIL}</strong> quoting order <strong>{orderConfirmed}</strong> if you don't hear back within 24 hours.</>}
                   </span>
                 </>
               )}
@@ -245,7 +307,22 @@ export default function CheckoutPage() {
               </div>
               <div>
                 <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Email Address *</label>
-                <input type="email" required value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-cefi-green" />
+                {/* Locked to the signed-in account. The backend also ignores any
+                    email in the request and uses the verified session's address. */}
+                <div className="relative">
+                  <input
+                    type="email"
+                    required
+                    readOnly
+                    aria-readonly="true"
+                    tabIndex={-1}
+                    value={formData.email}
+                    title="Order confirmations are sent to your registered account email"
+                    className="w-full pl-4 pr-10 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-600 cursor-not-allowed select-all focus:outline-none"
+                  />
+                  <Lock className="w-4 h-4 text-gray-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+                <p className="mt-1 text-[11px] text-gray-500">Confirmation is sent to your registered account email.</p>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -307,6 +384,12 @@ export default function CheckoutPage() {
                 </>
               )}
             </button>
+            {submitError && (
+              <div role="alert" className="flex items-start space-x-2 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
+                <span>{submitError}</span>
+              </div>
+            )}
             <p className="text-center text-[11px] text-gray-400">
               Your order is emailed automatically to <strong>{COMPANY_ORDER_EMAIL}</strong>
             </p>

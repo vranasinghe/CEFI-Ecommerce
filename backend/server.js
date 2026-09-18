@@ -10,6 +10,7 @@ const cookieParser = require('cookie-parser');
 const { requireAuth } = require('./middleware/auth');
 const { sanitizeText, sanitizeHtml, sanitizeHeader, isValidEmail, isValidString } = require('./lib/sanitize');
 require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
+const { sendOrderEmails } = require('./lib/order-email-service');
 
 // ── CRITICAL SECURITY: No hardcoded credentials. Fail loudly if env vars missing.
 const EMAIL_USER = process.env.EMAIL_USER;
@@ -181,6 +182,9 @@ const allowedOrigins = [
   process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/\/$/, '') : null,
   process.env.FRONTEND_URL_WWW ? process.env.FRONTEND_URL_WWW.replace(/\/$/, '') : null,
   process.env.NODE_ENV !== 'production' ? 'http://localhost:3000' : null,
+  // Vite dev server port (frontend/vite.config.js). Without this, the checkout
+  // POST is CORS-rejected locally and only the admin-side fallback email fires.
+  process.env.NODE_ENV !== 'production' ? 'http://localhost:3001' : null,
   process.env.NODE_ENV !== 'production' ? 'http://localhost:5173' : null,
 ].filter(Boolean);
 
@@ -1257,177 +1261,58 @@ app.get('/api/orders', requireAuth, (req, res) => {
   return res.json(localOrders);
 });
 
-// ── Order Email Delivery Function ────────────────────────────────────────────
-async function sendOrderEmail(orderRecord) {
-  const targetEmail = orderRecord.targetEmail || 'ceylonecofreshinfinity@gmail.com';
-  const customer = orderRecord.customer || {};
-  const items = orderRecord.items || [];
-
-  const itemsHtml = items.map(item => `
-    <tr>
-      <td style="padding: 10px 14px; border-bottom: 1px solid #eee; font-weight: bold; color: #1F532E;">${item.name}</td>
-      <td style="padding: 10px 14px; border-bottom: 1px solid #eee; text-align: center; font-weight: bold; color: #1F532E; background-color: #f8fafc;">${item.quantity} ${item.quantity > 1 ? 'Units' : 'Unit'}</td>
-    </tr>
-  `).join('');
-
-  const itemsText = items.map(item => `• ${item.name} (Quantity: ${item.quantity})`).join('\n');
-
-  const subject = `🛒 New CEFI Export Order Request [${orderRecord.orderId}] - ${customer.name || 'Customer'}`;
-
-  const htmlContent = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
-      <div style="background-color: #1F532E; color: #ffffff; padding: 24px; text-align: center;">
-        <h2 style="margin: 0; color: #D4AF37; font-size: 22px;">Ceylon Eco Fresh Infinity (Pvt) Ltd</h2>
-        <p style="margin: 6px 0 0; font-size: 13px; color: #d1fae5;">New Customer Order Notification</p>
-      </div>
-      <div style="padding: 24px; color: #334155;">
-        <div style="background-color: #f8fafc; padding: 12px 16px; border-radius: 10px; margin-bottom: 20px;">
-          <p style="margin: 0; font-size: 14px;"><strong>Order ID:</strong> <span style="font-family: monospace; color: #1F532E; font-weight: bold;">${orderRecord.orderId}</span></p>
-          <p style="margin: 4px 0 0; font-size: 12px; color: #64748b;">Date: ${new Date().toLocaleString()}</p>
-        </div>
-
-        <h3 style="color: #1F532E; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; font-size: 15px;">Customer & Delivery Details</h3>
-        <table style="width: 100%; font-size: 13px; line-height: 1.6; margin-bottom: 20px;">
-          <tr><td style="width: 140px; font-weight: bold; color: #64748b;">Full Name:</td><td><strong>${customer.name}</strong></td></tr>
-          <tr><td style="font-weight: bold; color: #64748b;">Email Address:</td><td><a href="mailto:${customer.email}" style="color: #1F532E; font-weight: bold;">${customer.email}</a></td></tr>
-          <tr><td style="font-weight: bold; color: #64748b;">Phone / WhatsApp:</td><td><strong>${customer.phone || 'N/A'}</strong></td></tr>
-          <tr><td style="font-weight: bold; color: #64748b;">Delivery Address:</td><td>${customer.address || ''}, ${customer.city || ''}, ${customer.postalCode || ''}, ${customer.country || ''}</td></tr>
-        </table>
-
-        <h3 style="color: #1F532E; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; font-size: 15px;">Requested Products</h3>
-        <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; border: 1px solid #e2e8f0; border-radius: 8px;">
-          <thead>
-            <tr style="background-color: #f1f5f9; text-align: left; color: #475569;">
-              <th style="padding: 10px 14px;">Product</th>
-              <th style="padding: 10px 14px; text-align: center;">Requested Quantity</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${itemsHtml}
-          </tbody>
-        </table>
-
-        <div style="background-color: #ecfdf5; border-left: 4px solid #1F532E; padding: 12px 16px; border-radius: 6px; font-size: 12px; color: #065f46;">
-          <strong>Order Type:</strong> ${orderRecord.paymentMethod || 'Direct Export Order'} — Please review dispatch inventory and contact client with proforma invoice.
-        </div>
-      </div>
-      <div style="background-color: #f8fafc; padding: 14px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
-        Ceylon Eco Fresh Infinity (Pvt) Ltd · E-Commerce Automated Dispatch System
-      </div>
-    </div>
-  `;
-
-  // 1. Send via Persistent SMTP
-  if (mailTransporter) {
-    try {
-      const adminOptions = {
-        from: `"CEFI Export Orders" <${EMAIL_USER.replace('@', '+website@')}>`,
-        to: targetEmail,
-        replyTo: customer.email,
-        subject: subject,
-        headers: { 'X-Priority': '1', 'X-MSMail-Priority': 'High', 'Importance': 'High' },
-        text: `New Order: ${orderRecord.orderId}\nCustomer: ${customer.name} (${customer.email})\nPhone: ${customer.phone}\nAddress: ${customer.address}, ${customer.city}, ${customer.country}\n\nProducts:\n${itemsText}`,
-        html: htmlContent,
-      };
-
-      const customerOptions = (customer.email && customer.email !== targetEmail) ? {
-        from: `"Ceylon Eco Fresh Infinity" <${EMAIL_USER}>`,
-        to: customer.email,
-        subject: `✅ Order Received [${orderRecord.orderId}] — Ceylon Eco Fresh Infinity`,
-        text: `Dear ${customer.name},\n\nThank you for your order! Your Order ID is: ${orderRecord.orderId}\n\nProducts:\n${itemsText}\n\nDelivery to: ${customer.address}, ${customer.city}, ${customer.country}\n\nWe will contact you within 24 hours.\n\nBest regards,\nCeylon Eco Fresh Infinity`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
-            <div style="background-color: #1F532E; color: #ffffff; padding: 24px; text-align: center;">
-              <h2 style="margin: 0; color: #D4AF37; font-size: 22px;">Ceylon Eco Fresh Infinity (Pvt) Ltd</h2>
-              <p style="margin: 6px 0 0; font-size: 13px; color: #d1fae5;">Order Request Received</p>
-            </div>
-            <div style="padding: 24px; color: #334155;">
-              <p style="font-size: 15px; margin: 0 0 4px;">Dear <strong>${customer.name}</strong>,</p>
-              <p style="font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 20px;">Thank you for your order request! We have received it and our export team will contact you within <strong>24 hours</strong> to confirm stock availability, logistics, and dispatch schedule.</p>
-              <div style="background-color: #f0fdf4; padding: 12px 16px; border-radius: 10px; margin-bottom: 20px;">
-                <p style="margin: 0; font-size: 14px;"><strong>Order Reference:</strong> <span style="font-family: monospace; color: #1F532E; font-weight: bold;">${orderRecord.orderId}</span></p>
-                <p style="margin: 4px 0 0; font-size: 12px; color: #64748b;">Date: ${new Date().toLocaleString()}</p>
-              </div>
-              <h3 style="color: #1F532E; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; font-size: 14px;">Your Requested Items</h3>
-              <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; border: 1px solid #e2e8f0; border-radius: 8px;">
-                <thead>
-                  <tr style="background-color: #f1f5f9; text-align: left; color: #475569;">
-                    <th style="padding: 10px 14px;">Product</th>
-                    <th style="padding: 10px 14px; text-align: center;">Quantity</th>
-                  </tr>
-                </thead>
-                <tbody>${itemsHtml}</tbody>
-              </table>
-              <div style="background-color: #f8fafc; border-left: 4px solid #D4AF37; padding: 12px 16px; border-radius: 6px; font-size: 13px; color: #92400e; margin-bottom: 16px;">
-                <strong>Delivery Destination:</strong> ${customer.address || ''}, ${customer.city || ''}, ${customer.postalCode || ''}, ${customer.country || ''}
-              </div>
-              <p style="font-size: 13px; color: #64748b;">If you have any questions, reply to this email or contact us at <a href="tel:+94714634485" style="color: #1F532E;">+94 714 634 485</a> (WhatsApp available).</p>
-            </div>
-            <div style="background-color: #f8fafc; padding: 14px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
-              Ceylon Eco Fresh Infinity (Pvt) Ltd · No. 278/1/A, Meegasmulla, Dedigamuwa · ceylonecofreshinfinity@gmail.com
-            </div>
-          </div>
-        `
-      } : null;
-
-      const result = await sendDualEmails(adminOptions, customerOptions);
-      if (result.success) return { success: true, method: 'smtp' };
-    } catch (smtpErr) {
-      console.warn('⚠️ [Nodemailer] SMTP failed, attempting fallback API delivery:', smtpErr.message);
-    }
-  }
-
-  // 2. Direct HTTP email delivery fallback to target inbox
-  try {
-    const payload = {
-      _subject: subject,
-      _replyto: customer.email,
-      order_reference: orderRecord.orderId,
-      customer_name: customer.name,
-      customer_email: customer.email,
-      customer_phone: customer.phone,
-      delivery_address: `${customer.address}, ${customer.city}, ${customer.country}`,
-      products: itemsText,
-      date: new Date().toLocaleString()
-    };
-
-    const res = await fetch(`https://formsubmit.co/ajax/${targetEmail}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    const resData = await res.json();
-    console.log(`✅ [Email Dispatcher] Order email dispatched to ${targetEmail}:`, resData);
-    return { success: true, method: 'formsubmit' };
-  } catch (apiErr) {
-    console.warn(`⚠️ [Email Dispatcher] Notice:`, apiErr.message);
-    return { success: false, error: apiErr.message };
-  }
+// ── Shipping rule ─────────────────────────────────────────────────────────────
+// Mirrors the frontend rule (free over $100). Recomputed server-side: the
+// client's figures are display values and must never be trusted for billing.
+function calculateShipping(subtotal) {
+  return subtotal > 100 || subtotal === 0 ? 0 : 15.0;
 }
 
-app.post('/api/orders', async (req, res) => {
+// requireAuth verifies the Supabase access token and attaches req.user.
+app.post('/api/orders', requireAuth, async (req, res) => {
   // MEDIUM FIX: Remove attacker-controlled targetEmail from req.body
   const { customer, items, paymentMethod } = req.body;
   if (!customer || !items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ success: false, message: 'Invalid order data: customer details and items are required.' });
   }
 
+  // The confirmation recipient is the buyer's REGISTERED account email, read
+  // from the verified session token — never from the request body. A client
+  // that edits the form or crafts its own request still cannot redirect the
+  // confirmation (or order history) to a different address.
+  const customerEmail = String(req.user.email || '').trim().toLowerCase();
+  if (!isValidEmail(customerEmail)) {
+    return res.status(400).json({ success: false, message: 'Your account has no valid email address. Please update your profile and try again.' });
+  }
+  // Only confirmed addresses count as "registered" — an unverified signup
+  // could belong to someone else.
+  if (!req.user.email_confirmed_at) {
+    return res.status(403).json({ success: false, code: 'EMAIL_UNCONFIRMED', message: 'Please confirm your email address before placing an order.' });
+  }
+  if (customer.email && String(customer.email).trim().toLowerCase() !== customerEmail) {
+    console.warn(`⚠️  [Orders] Body email '${customer.email}' ignored for user ${req.user.id}; using account email.`);
+  }
+
   // LOW FIX: Crypto-secure order ID (not Math.random)
   const crypto = require('crypto');
   const orderId = `CEFI-ORD-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 
-  // MEDIUM FIX: Always use server-side admin email — never trust client-supplied destination
+  // MEDIUM FIX: Always use server-side admin email — never trust client-supplied destination.
+  // This is the FIXED recipient of the "Order Confirmed" internal alert.
   const destinationEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
+
+  const subtotal = items.reduce((sum, item) => sum + (Number(item.price) || 0) * (Number(item.quantity) || 0), 0);
+  const shippingCost = calculateShipping(subtotal);
 
   // MEDIUM FIX: Bounded array — cap in-memory store to prevent DoS
   const orderRecord = {
     orderId,
-    customer,
+    userId: req.user.id,
+    customer: { ...customer, email: customerEmail },
     items,
+    subtotal,
+    shippingCost,
+    totalAmount: subtotal + shippingCost,
     paymentMethod: paymentMethod || 'Direct Export Order Request',
     targetEmail: destinationEmail,
     status: 'Confirmed',
@@ -1436,12 +1321,54 @@ app.post('/api/orders', async (req, res) => {
   pushBounded(localOrders, orderRecord);
 
   if (process.env.NODE_ENV !== 'production') {
-    console.log(`🛒 New Order [${orderId}] with ${items.length} items`);
+    console.log(`🛒 New Order [${orderId}] with ${items.length} items → confirmation to ${customerEmail}`);
   }
 
-  sendOrderEmail(orderRecord).catch(err => console.error('Email send error:', err));
+  // ── Dual notification ───────────────────────────────────────────────────────
+  // customer  → "Order Received"  → dynamic, the address typed at checkout
+  // admin     → "Order Confirmed" → fixed, ADMIN_EMAIL
+  // Awaited so the response can tell the UI what actually happened. The service
+  // never rejects, and the try/catch guarantees a saved order is still confirmed
+  // to the buyer even if the mail layer fails outright.
+  let emailStatus = { success: false, reason: 'not attempted' };
+  try {
+    emailStatus = await sendOrderEmails({
+      customerEmail,
+      customerName: customer.name,
+      orderId,
+      subtotal,
+      shippingCost,
+      totalAmount: orderRecord.totalAmount,
+      items,
+      paymentMethod: orderRecord.paymentMethod,
+      placedAt: orderRecord.createdAt,
+      shipping: {
+        address: customer.address,
+        city: customer.city,
+        postalCode: customer.postalCode,
+        country: customer.country,
+        phone: customer.phone
+      }
+    });
+  } catch (emailErr) {
+    console.error(`⚠️  [Orders] Email dispatch failed for ${orderId}:`, emailErr.message);
+    emailStatus = { success: false, reason: emailErr.message };
+  }
 
-  return res.json({ success: true, orderId, message: 'Order placed & email notification dispatched successfully!' });
+  return res.json({
+    success: true,
+    orderId,
+    totalAmount: orderRecord.totalAmount,
+    message: 'Order placed successfully.',
+    notifications: {
+      emailed: emailStatus.success,
+      // Echoed back so the confirmation screen can name the real recipients
+      // instead of assuming the send worked.
+      customerEmail: emailStatus.customer?.sent ? emailStatus.customer.to : null,
+      adminEmail: emailStatus.admin?.sent ? emailStatus.admin.to : null,
+      detail: emailStatus.success ? undefined : (emailStatus.reason || emailStatus.customer?.error || 'One or more emails failed to send.')
+    }
+  });
 });
 
 // ── Start Server ──────────────────────────────────────────────────────────────
