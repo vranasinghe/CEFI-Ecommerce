@@ -11,14 +11,17 @@
  *     function at import time (the failure mode that bit us with jsdom).
  *  3. Both emails are dispatched concurrently with Promise.all so the customer
  *     and admin sends overlap rather than queue.
+ *  4. Resend is the only delivery channel. There is intentionally no SMTP or
+ *     form-service fallback: failures are reported to the caller instead of
+ *     being hidden behind a different, admin-only route.
  *
  * Required environment variables:
  *   RESEND_API_KEY     — Resend API key (required for sending)
  *   ADMIN_EMAIL        — internal inbox that receives the sales alert
- *   RESEND_FROM_EMAIL  — optional; "CEFI <orders@yourdomain.com>".
- *                        Defaults to onboarding@resend.dev, which Resend only
- *                        permits delivering to your own account address —
- *                        verify a custom domain before going live.
+ *   RESEND_FROM_EMAIL  — "CEFI Orders <orders@ceylonecofreshinfinity.com>".
+ *                        Must be on a Resend-verified domain. If unset it
+ *                        defaults to onboarding@resend.dev, which Resend only
+ *                        delivers to the account owner — customers get nothing.
  */
 
 const { buildCustomerEmail, buildAdminEmail } = require('./email-templates');
@@ -57,60 +60,6 @@ function getResendClient() {
     cachedClient = null;
   }
   return cachedClient;
-}
-
-// ── Lazy SMTP fallback transport ────────────────────────────────────────────
-// Resend will not deliver to arbitrary recipients while sending from the shared
-// onboarding@resend.dev sandbox — only to the account owner's own address. Real
-// customers therefore need a second route until the custom domain is verified.
-// Gmail SMTP (already configured in this project) fills that gap.
-let cachedTransport;
-function getSmtpTransport() {
-  if (cachedTransport !== undefined) return cachedTransport;
-
-  const { EMAIL_USER, EMAIL_PASS } = process.env;
-  if (!EMAIL_USER || !EMAIL_PASS) {
-    cachedTransport = null;
-    return cachedTransport;
-  }
-
-  try {
-    const nodemailer = require('nodemailer');
-    cachedTransport = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      auth: { user: EMAIL_USER, pass: EMAIL_PASS },
-    });
-  } catch (err) {
-    console.error('❌ Could not initialise SMTP fallback transport:', err.message);
-    cachedTransport = null;
-  }
-  return cachedTransport;
-}
-
-/** Sends one email over SMTP. Like dispatch(), it resolves rather than throws. */
-async function dispatchViaSmtp(label, { to, subject, html, text, replyTo }) {
-  const transport = getSmtpTransport();
-  if (!transport) {
-    return { sent: false, error: 'SMTP fallback not configured (EMAIL_USER/EMAIL_PASS missing)' };
-  }
-
-  try {
-    const info = await transport.sendMail({
-      from: `"${require('./email-templates').BRAND.name}" <${process.env.EMAIL_USER}>`,
-      to,
-      replyTo,
-      subject,
-      html,
-      text,
-    });
-    console.log(`✅ [SMTP:${label}] delivered to ${to} (${info.messageId})`);
-    return { sent: true, id: info.messageId, via: 'smtp' };
-  } catch (err) {
-    console.error(`❌ [SMTP:${label}] ${err.message}`);
-    return { sent: false, error: err.message };
-  }
 }
 
 // ── Input normalisation ─────────────────────────────────────────────────────
@@ -283,29 +232,7 @@ async function sendOrderEmails(orderData) {
   }
 
   // Both requests are in flight simultaneously: total latency ≈ the slower one.
-  let [customerResult, adminResult] = await Promise.all(tasks);
-
-  // ── 5. SMTP fallback for the customer only ───────────────────────────────
-  // The admin address is the Resend account owner, so Resend can always reach
-  // it. The customer address is arbitrary and is what the sandbox sender
-  // rejects — so that is the one send worth retrying over SMTP.
-  if (!customerResult.sent) {
-    console.log(`↪️  [OrderEmails] Resend could not reach ${order.customerEmail}; trying SMTP…`);
-    const smtpResult = await dispatchViaSmtp('customer', {
-      to: order.customerEmail,
-      replyTo: REPLY_TO,
-      subject: customerTemplate.subject,
-      html: customerTemplate.html,
-      text: customerTemplate.text,
-    });
-    customerResult = {
-      recipient: 'customer',
-      to: order.customerEmail,
-      ...smtpResult,
-      // Keep the original failure visible for debugging.
-      resendError: customerResult.error,
-    };
-  }
+  const [customerResult, adminResult] = await Promise.all(tasks);
 
   const durationMs = Date.now() - startedAt;
   const success = Boolean(customerResult?.sent && (!ADMIN_EMAIL || adminResult?.sent));
