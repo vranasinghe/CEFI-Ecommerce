@@ -6,6 +6,18 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3001
+    },
+    {
+      "name": "cefi-backend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "backend", "start"],
+      "port": 5000
+    },
+    {
+      "name": "cefi-frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
+      "port": 3001
     }
   ]
 }
