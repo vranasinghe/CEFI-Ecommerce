@@ -178,33 +178,61 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // HIGH FIX: Tight CORS — only allow known frontend origins
+// Origins are normalised before comparison: an env value with a stray space,
+// trailing slash or different letter case must not silently block the site.
+const normaliseOrigin = (value) => String(value || '').trim().replace(/\/+$/, '').toLowerCase();
+
 const allowedOrigins = [
-  process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/\/$/, '') : null,
-  process.env.FRONTEND_URL_WWW ? process.env.FRONTEND_URL_WWW.replace(/\/$/, '') : null,
+  process.env.FRONTEND_URL,
+  process.env.FRONTEND_URL_WWW,
   process.env.NODE_ENV !== 'production' ? 'http://localhost:3000' : null,
   // Vite dev server port (frontend/vite.config.js). Without this, the checkout
   // POST is CORS-rejected locally and only the admin-side fallback email fires.
   process.env.NODE_ENV !== 'production' ? 'http://localhost:3001' : null,
   process.env.NODE_ENV !== 'production' ? 'http://localhost:5173' : null,
-].filter(Boolean);
+].map(normaliseOrigin).filter(Boolean);
 
-app.use(cors({
-  origin: (origin, callback) => {
-    // If no origins configured (FRONTEND_URL missing), allow all — open until env vars set
-    if (allowedOrigins.length === 0) {
-      callback(null, true);
-      return;
-    }
-    // Allow server-to-server (no origin) and whitelisted origins
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error(`CORS policy: origin '${origin}' is not allowed`));
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
+/**
+ * True when the browser's Origin is this same deployment. On Vercel the
+ * frontend and /api are served from one domain, so these requests are not
+ * cross-origin at all and must never depend on FRONTEND_URL matching exactly.
+ * (Browsers send Origin on same-origin POSTs, which is why checkout broke
+ * while GET-only pages kept working.)
+ */
+function isSameOrigin(req, origin) {
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '')
+    .split(',')[0].trim().toLowerCase();
+  if (!host) return false;
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}
+
+app.use(cors((req, callback) => {
+  const rawOrigin = req.headers.origin;
+  const origin = normaliseOrigin(rawOrigin);
+
+  const allowed =
+    !rawOrigin ||                         // server-to-server / curl
+    allowedOrigins.length === 0 ||        // not configured yet: open
+    allowedOrigins.includes(origin) ||    // explicitly whitelisted
+    isSameOrigin(req, rawOrigin);         // same deployment
+
+  if (!allowed) {
+    const err = new Error(`CORS policy: origin '${rawOrigin}' is not allowed`);
+    err.status = 403;
+    err.isCorsRejection = true;
+    return callback(err);
+  }
+
+  callback(null, {
+    origin: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  });
 }));
 app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
@@ -1369,6 +1397,17 @@ app.post('/api/orders', requireAuth, async (req, res) => {
       detail: emailStatus.success ? undefined : (emailStatus.reason || emailStatus.customer?.error || 'One or more emails failed to send.')
     }
   });
+});
+
+// ── CORS rejection handler ────────────────────────────────────────────────────
+// Without this, a rejected origin surfaces as a generic HTML 500, which the
+// checkout treats as "API down" and silently falls back to admin-only email.
+app.use((err, req, res, next) => {
+  if (err && err.isCorsRejection) {
+    console.warn(`⛔ ${err.message} (allowed: ${allowedOrigins.join(', ') || 'any'})`);
+    return res.status(403).json({ success: false, message: 'Requests from this origin are not allowed.' });
+  }
+  return next(err);
 });
 
 // ── Start Server ──────────────────────────────────────────────────────────────
