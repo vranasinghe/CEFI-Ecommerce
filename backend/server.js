@@ -5,7 +5,7 @@ const fs = require('fs');
 const nodemailer = require('nodemailer');
 const { Resend } = require('resend');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
 const { requireAuth } = require('./middleware/auth');
 const { sanitizeText, sanitizeHtml, sanitizeHeader, isValidEmail, isValidString } = require('./lib/sanitize');
@@ -17,6 +17,11 @@ const EMAIL_USER = process.env.EMAIL_USER;
 const EMAIL_PASS = process.env.EMAIL_PASS;
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'CEFI Notifications <onboarding@resend.dev>';
+// Bare address of the verified sender ("CEFI Orders <orders@x.com>" → "orders@x.com"),
+// so each form can send under its own display name from the same verified domain.
+const RESEND_FROM_ADDRESS = (RESEND_FROM_EMAIL.match(/<([^>]+)>/) || [null, RESEND_FROM_EMAIL])[1].trim();
+// Internal inbox for contact / quote / newsletter alerts — same inbox as order alerts.
+const ADMIN_INBOX = process.env.ADMIN_EMAIL || EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
 
 if (!EMAIL_USER || !EMAIL_PASS) {
   console.warn('⚠️  SECURITY WARNING: EMAIL_USER or EMAIL_PASS not set in environment. Email via SMTP is disabled.');
@@ -61,84 +66,84 @@ if (EMAIL_USER && EMAIL_PASS) {
   });
 }
 
-// Helper to send individual message via Resend
-async function sendViaResend(options) {
-  if (!resendClient) return { error: { message: 'Resend not initialized' } };
-  return await resendClient.emails.send({
-    from: RESEND_FROM_EMAIL,
-    to: options.to,
-    reply_to: options.replyTo || options.reply_to || undefined,
-    subject: options.subject,
-    html: options.html,
-    text: options.text || undefined
-  });
-}
+// Sends one message. Resend (verified domain) first; Gmail SMTP only if Resend
+// is unconfigured or rejects the send. Never throws — resolves to true/false.
+// options: { fromName, to, replyTo, subject, html, text }
+async function sendOneEmail(label, options) {
+  const fromName = options.fromName || 'Ceylon Eco Fresh Infinity';
 
-// Helper to send admin and customer emails concurrently (Smart Hybrid Dual Send)
-async function sendDualEmails(adminOptions, customerOptions) {
-  let adminSent = false;
-  let customerSent = false;
-
-  // ── 1. Dispatch Admin Notification via Resend (Fast & Serverless Ready) ─────
   if (resendClient) {
     try {
-      const adminRes = await sendViaResend(adminOptions);
-      if (adminRes && !adminRes.error) {
-        adminSent = true;
-        console.log(`✅ [Resend] Admin notification sent to ${adminOptions.to} (ID: ${adminRes.data?.id || 'ok'})`);
-      } else {
-        console.warn(`⚠️ [Resend] Admin send notice:`, adminRes?.error?.message || 'Unknown error');
+      const { data, error } = await resendClient.emails.send({
+        from: `${fromName} <${RESEND_FROM_ADDRESS}>`,
+        to: options.to,
+        replyTo: options.replyTo || undefined,
+        subject: options.subject,
+        html: options.html,
+        text: options.text || undefined
+      });
+      if (!error) {
+        console.log(`✅ [Resend:${label}] sent to ${options.to} (id: ${data?.id || 'n/a'})`);
+        return true;
       }
+      console.warn(`⚠️ [Resend:${label}] ${error.message || 'send rejected'}`);
     } catch (err) {
-      console.warn(`⚠️ [Resend] Admin send exception:`, err.message);
+      console.warn(`⚠️ [Resend:${label}] exception: ${err.message}`);
     }
   }
 
-  // If Admin not sent via Resend, fallback to SMTP
-  if (!adminSent && mailTransporter) {
+  if (mailTransporter) {
     try {
-      const info = await mailTransporter.sendMail(adminOptions);
-      adminSent = true;
-      console.log(`✅ [Nodemailer] Admin notification sent via SMTP to ${adminOptions.to} (${info.messageId})`);
+      const info = await mailTransporter.sendMail({
+        from: `"${fromName}" <${EMAIL_USER}>`,
+        to: options.to,
+        replyTo: options.replyTo || undefined,
+        subject: options.subject,
+        html: options.html,
+        text: options.text || undefined
+      });
+      console.log(`✅ [SMTP:${label}] sent to ${options.to} (${info.messageId})`);
+      return true;
     } catch (smtpErr) {
-      console.error(`❌ [Nodemailer] Admin SMTP error:`, smtpErr.message);
+      console.error(`❌ [SMTP:${label}] ${smtpErr.message}`);
     }
   }
 
-  // ── 2. Dispatch Customer Confirmation ────────────────────────────────────────
-  if (customerOptions && customerOptions.to && customerOptions.to !== adminOptions.to) {
-    // A. First try Resend (succeeds if custom domain verified or account email)
-    if (resendClient) {
-      try {
-        const custRes = await sendViaResend(customerOptions);
-        if (custRes && !custRes.error) {
-          customerSent = true;
-          console.log(`✅ [Resend] Customer confirmation sent to ${customerOptions.to} (ID: ${custRes.data?.id || 'ok'})`);
-        } else {
-          console.log(`ℹ️ [Resend] Customer domain not yet verified in Resend. Falling back to Gmail SMTP for customer...`);
-        }
-      } catch (err) {
-        console.log(`ℹ️ [Resend] Customer send notice: ${err.message}. Routing to Gmail SMTP...`);
-      }
-    }
+  return false;
+}
 
-    // B. If Resend cannot send to external customer (onboarding@resend.dev restriction), send via Gmail SMTP!
-    if (!customerSent && mailTransporter) {
-      try {
-        const custInfo = await mailTransporter.sendMail(customerOptions);
-        customerSent = true;
-        console.log(`✅ [Nodemailer] Customer confirmation sent via Gmail SMTP to ${customerOptions.to} (${custInfo.messageId})`);
-      } catch (smtpErr) {
-        console.warn(`⚠️ [Nodemailer] Customer SMTP error:`, smtpErr.message);
-      }
-    }
-  }
+// Sends the admin alert and the customer acknowledgement concurrently.
+// customerOptions may be null (e.g. diagnostic sends).
+async function sendDualEmails(adminOptions, customerOptions) {
+  const wantsCustomer = Boolean(customerOptions && customerOptions.to && customerOptions.to !== adminOptions.to);
+
+  const [adminSent, customerSent] = await Promise.all([
+    sendOneEmail('admin', adminOptions),
+    wantsCustomer ? sendOneEmail('customer', customerOptions) : Promise.resolve(false)
+  ]);
 
   return {
-    success: adminSent || customerSent,
+    success: adminSent && (!wantsCustomer || customerSent),
+    method: resendClient ? 'resend' : 'smtp',
     adminSent,
-    customerSent: customerOptions ? customerSent : true
+    customerSent
   };
+}
+
+// Admin-only last resort for form leads: if neither Resend nor SMTP reached the
+// inbox, push the submission through FormSubmit so the enquiry isn't lost.
+async function sendAdminViaFormSubmit(payload) {
+  try {
+    const res = await fetch(`https://formsubmit.co/ajax/${ADMIN_INBOX}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('❌ [FormSubmit] fallback failed:', err.message);
+    return false;
+  }
 }
 
 // Try to load multer (for file uploads)
@@ -176,6 +181,19 @@ const limiter = rateLimit({
   legacyHeaders: false,
 });
 app.use(limiter);
+
+// Public forms email whatever address is typed in, from our verified domain.
+// A tight per-IP cap stops them being used to spam third parties (which would
+// also burn the domain's sending reputation). Vercel sets x-real-ip to the
+// client IP; locally req.ip is already the client.
+const formLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => ipKeyGenerator(req.headers['x-real-ip'] || req.ip || ''),
+  message: { success: false, message: 'Too many submissions. Please wait a few minutes and try again.' }
+});
 
 // HIGH FIX: Tight CORS — only allow known frontend origins
 // Origins are normalised before comparison: an env value with a stray space,
@@ -880,7 +898,7 @@ app.delete('/api/blog/:id', requireAuth, async (req, res) => {
 
 // ── Contact / Quotes / Orders ─────────────────────────────────────────────────
 async function sendContactEmail(record) {
-  const targetEmail = process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
+  const targetEmail = ADMIN_INBOX;
   const { name, email, phone, subject, message } = record;
   const emailSubject = `📬 New Contact Inquiry: ${subject || 'General Inquiry'} - from ${name}`;
 
@@ -911,11 +929,12 @@ ${message}
     </div>
   `;
 
-  // 1. Send via Persistent SMTP
-  if (mailTransporter) {
+  // 1. Resend (verified domain), with Gmail SMTP as a per-message fallback
+  let customerSent = false;
+  if (resendClient || mailTransporter) {
     try {
       const adminOptions = {
-        from: `"CEFI Contact Form" <${EMAIL_USER.replace('@', '+website@')}>`,
+        fromName: 'CEFI Contact Form',
         to: targetEmail,
         replyTo: email,
         subject: emailSubject,
@@ -924,7 +943,8 @@ ${message}
       };
 
       const customerOptions = (email && email !== targetEmail) ? {
-        from: `"Ceylon Eco Fresh Infinity" <${EMAIL_USER}>`,
+        fromName: 'Ceylon Eco Fresh Infinity',
+        replyTo: targetEmail,
         to: email,
         subject: `✅ We received your message, ${name.split(' ')[0]}! — CEFI`,
         text: `Dear ${name},\n\nThank you for contacting Ceylon Eco Fresh Infinity. We have received your message regarding "${subject}" and our team will respond within 24 hours.\n\nFor urgent matters, contact us at +94 714 634 485.\n\nBest regards,\nCeylon Eco Fresh Infinity Team`,
@@ -951,45 +971,29 @@ ${message}
       } : null;
 
       const result = await sendDualEmails(adminOptions, customerOptions);
-      if (result.success) return { success: true, method: 'smtp' };
+      customerSent = result.customerSent;
+      if (result.adminSent) return result;
     } catch (err) {
-      console.warn('⚠️ [Nodemailer] Contact email failed:', err.message);
+      console.warn('⚠️ [Email] Contact email failed:', err.message);
     }
   }
 
-  // 2. Direct HTTP email delivery fallback to target inbox
-  try {
-    const payload = {
-      _subject: emailSubject,
-      _replyto: email,
-      name,
-      email,
-      phone: phone || 'Not provided',
-      subject: subject || 'General Inquiry',
-      message,
-      submitted_at: new Date().toLocaleString()
-    };
-
-    const res = await fetch(`https://formsubmit.co/ajax/${targetEmail}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    const resData = await res.json();
-    console.log(`✅ [Email Dispatcher] Contact inquiry delivered to ${targetEmail}:`, resData);
-    return { success: true, method: 'formsubmit' };
-  } catch (apiErr) {
-    console.error(`❌ [Email Dispatcher] Error delivering contact email:`, apiErr.message);
-    return { success: true, method: 'recorded' };
-  }
+  // 2. Admin-only fallback so the enquiry still reaches the inbox
+  const delivered = await sendAdminViaFormSubmit({
+    _subject: emailSubject,
+    _replyto: email,
+    name,
+    email,
+    phone: phone || 'Not provided',
+    subject: subject || 'General Inquiry',
+    message,
+    submitted_at: new Date().toLocaleString()
+  });
+  return { success: delivered, method: 'formsubmit', adminSent: delivered, customerSent };
 }
 
 // ── Contact Route (POST /api/contact) ─────────────────────────────────────────
-app.post('/api/contact', async (req, res) => {
+app.post('/api/contact', formLimiter, async (req, res) => {
   const { name, email, phone, subject, message } = req.body;
 
   // MEDIUM FIX: Strict input validation with email format check and length caps
@@ -1016,16 +1020,20 @@ app.post('/api/contact', async (req, res) => {
     console.log(`📬 New Contact Message from ${record.name}`);
   }
   const dispatchResult = await sendContactEmail(record);
+  if (!dispatchResult.adminSent) {
+    return res.status(502).json({ success: false, message: 'We could not deliver your message right now. Please try again.', dispatch: dispatchResult });
+  }
   return res.json({
     success: true,
     message: 'Your message has been sent to Ceylon Eco Fresh Infinity!',
+    customerEmailed: dispatchResult.customerSent,
     dispatch: dispatchResult
   });
 });
 
 // ── Newsletter Route (POST /api/newsletter) ──────────────────────────────────
 async function sendNewsletterEmail(email) {
-  const targetEmail = process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
+  const targetEmail = ADMIN_INBOX;
   const emailSubject = `📩 New Newsletter Subscriber: ${email}`;
 
   const htmlContent = `
@@ -1047,10 +1055,11 @@ async function sendNewsletterEmail(email) {
     </div>
   `;
 
-  if (mailTransporter) {
+  let customerSent = false;
+  if (resendClient || mailTransporter) {
     try {
       const adminOptions = {
-        from: `"CEFI Newsletter" <${EMAIL_USER.replace('@', '+website@')}>`,
+        fromName: 'CEFI Newsletter',
         to: targetEmail,
         replyTo: email,
         subject: emailSubject,
@@ -1059,7 +1068,8 @@ async function sendNewsletterEmail(email) {
       };
 
       const customerOptions = (email && email !== targetEmail) ? {
-        from: `"Ceylon Eco Fresh Infinity" <${EMAIL_USER}>`,
+        fromName: 'Ceylon Eco Fresh Infinity',
+        replyTo: targetEmail,
         to: email,
         subject: `✅ Welcome to the CEFI Newsletter!`,
         text: `Thank you for subscribing to the Ceylon Eco Fresh Infinity newsletter!`,
@@ -1080,32 +1090,24 @@ async function sendNewsletterEmail(email) {
       } : null;
 
       const result = await sendDualEmails(adminOptions, customerOptions);
-      if (result.success) return { success: true, method: 'smtp' };
+      customerSent = result.customerSent;
+      if (result.adminSent) return result;
     } catch (err) {
-      console.warn('⚠️ [Nodemailer] Newsletter email failed:', err.message);
+      console.warn('⚠️ [Email] Newsletter email failed:', err.message);
     }
   }
 
-  // Fallback
-  try {
-    const payload = {
-      _subject: emailSubject,
-      _replyto: email,
-      email,
-      subscribed_at: new Date().toLocaleString()
-    };
-    await fetch(`https://formsubmit.co/ajax/${targetEmail}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    return { success: true, method: 'formsubmit' };
-  } catch (apiErr) {
-    return { success: true, method: 'recorded' };
-  }
+  // Admin-only fallback
+  const delivered = await sendAdminViaFormSubmit({
+    _subject: emailSubject,
+    _replyto: email,
+    email,
+    subscribed_at: new Date().toLocaleString()
+  });
+  return { success: delivered, method: 'formsubmit', adminSent: delivered, customerSent };
 }
 
-app.post('/api/newsletter', async (req, res) => {
+app.post('/api/newsletter', formLimiter, async (req, res) => {
   const { email } = req.body;
 
   // MEDIUM FIX: Email format validation
@@ -1117,16 +1119,20 @@ app.post('/api/newsletter', async (req, res) => {
     console.log(`📬 New Newsletter Subscriber`);
   }
   const dispatchResult = await sendNewsletterEmail(email.trim().toLowerCase());
+  if (!dispatchResult.adminSent) {
+    return res.status(502).json({ success: false, message: 'We could not deliver your subscription right now. Please try again.', dispatch: dispatchResult });
+  }
   return res.json({
     success: true,
     message: 'Successfully subscribed to the newsletter!',
+    customerEmailed: dispatchResult.customerSent,
     dispatch: dispatchResult
   });
 });
 
 // ── Quote Request Email Delivery Function ────────────────────────────────────
 async function sendQuoteEmail(record) {
-  const targetEmail = process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
+  const targetEmail = ADMIN_INBOX;
   const { name, company, product, quantity, targetDestination, email, phone, notes } = record;
   const emailSubject = `📋 New Wholesale Quote Request: ${company || name} (${product})`;
 
@@ -1161,11 +1167,12 @@ ${notes}
     </div>
   `;
 
-  // 1. Send via Persistent SMTP
-  if (mailTransporter) {
+  // 1. Resend (verified domain), with Gmail SMTP as a per-message fallback
+  let customerSent = false;
+  if (resendClient || mailTransporter) {
     try {
       const adminOptions = {
-        from: `"CEFI Export Desk" <${EMAIL_USER.replace('@', '+website@')}>`,
+        fromName: 'CEFI Export Desk',
         to: targetEmail,
         replyTo: email,
         subject: emailSubject,
@@ -1174,7 +1181,8 @@ ${notes}
       };
 
       const customerOptions = (email && email !== targetEmail) ? {
-        from: `"Ceylon Eco Fresh Infinity" <${EMAIL_USER}>`,
+        fromName: 'Ceylon Eco Fresh Infinity',
+        replyTo: targetEmail,
         to: email,
         subject: `✅ Quote Request Received — ${product} | CEFI`,
         text: `Dear ${name},\n\nThank you for your quotation request for ${product} (${quantity}) to ${targetDestination}.\n\nOur trade team will respond within 1–2 business days with a detailed proforma invoice.\n\nFor urgent matters, contact us at +94 714 634 485.\n\nBest regards,\nCeylon Eco Fresh Infinity Export Team`,
@@ -1204,48 +1212,32 @@ ${notes}
       } : null;
 
       const result = await sendDualEmails(adminOptions, customerOptions);
-      if (result.success) return { success: true, method: 'smtp' };
+      customerSent = result.customerSent;
+      if (result.adminSent) return result;
     } catch (err) {
-      console.warn('⚠️ [Nodemailer] Quote email failed:', err.message);
+      console.warn('⚠️ [Email] Quote email failed:', err.message);
     }
   }
 
-  // 2. HTTP delivery fallback
-  try {
-    const payload = {
-      _subject: emailSubject,
-      _replyto: email,
-      contact_person: name,
-      company: company || 'Not specified',
-      email,
-      phone: phone || 'Not provided',
-      requested_product: product,
-      quantity,
-      destination: targetDestination,
-      notes: notes || '',
-      submitted_at: new Date().toLocaleString()
-    };
-
-    const res = await fetch(`https://formsubmit.co/ajax/${targetEmail}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    const resData = await res.json();
-    console.log(`✅ [Email Dispatcher] Quote request delivered to ${targetEmail}:`, resData);
-    return { success: true, method: 'formsubmit' };
-  } catch (apiErr) {
-    console.error(`❌ [Email Dispatcher] Error delivering quote email:`, apiErr.message);
-    return { success: true, method: 'recorded' };
-  }
+  // 2. Admin-only fallback so the quote request still reaches the inbox
+  const delivered = await sendAdminViaFormSubmit({
+    _subject: emailSubject,
+    _replyto: email,
+    contact_person: name,
+    company: company || 'Not specified',
+    email,
+    phone: phone || 'Not provided',
+    requested_product: product,
+    quantity,
+    destination: targetDestination,
+    notes: notes || '',
+    submitted_at: new Date().toLocaleString()
+  });
+  return { success: delivered, method: 'formsubmit', adminSent: delivered, customerSent };
 }
 
 // ── Quote Route (POST /api/quotes) ───────────────────────────────────────────
-app.post('/api/quotes', async (req, res) => {
+app.post('/api/quotes', formLimiter, async (req, res) => {
   const { name, company, email, phone, product, quantity, targetDestination, destinationPort, notes, message } = req.body;
 
   // MEDIUM FIX: Strict validation on all quote fields
@@ -1275,9 +1267,13 @@ app.post('/api/quotes', async (req, res) => {
     console.log(`📋 New Quote Request for product from client`);
   }
   const dispatchResult = await sendQuoteEmail(record);
+  if (!dispatchResult.adminSent) {
+    return res.status(502).json({ success: false, message: 'We could not deliver your quote request right now. Please try again.', dispatch: dispatchResult });
+  }
   return res.json({
     success: true,
     message: 'Your quote request has been submitted to Ceylon Eco Fresh Infinity!',
+    customerEmailed: dispatchResult.customerSent,
     dispatch: dispatchResult
   });
 });

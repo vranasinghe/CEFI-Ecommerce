@@ -27,30 +27,54 @@ export default function QuoteModal({ isOpen, onClose, initialProduct = '' }) {
 
     let sent = false;
 
-    // 1. Web3Forms (Shows "CEFI Quotes" as Sender in Gmail)
+    // 1. Backend (Resend) — emails the admin AND sends the buyer a confirmation.
     try {
-      const w3Res = await fetch('https://api.web3forms.com/submit', {
+      const res = await fetch('/api/quotes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '2a8d834e-5677-4c4c-b610-6844fe2ba187',
-          from_name: "CEFI Quotes",
-          subject: `📋 [Wholesale Quote] ${formData.companyName || formData.contactPerson} (${formData.productName})`,
           name: formData.contactPerson,
           company: formData.companyName,
           email: formData.email,
-          phone: formData.phone || 'N/A',
+          phone: formData.phone,
           product: formData.productName,
-          estimated_quantity: formData.estimatedQuantity,
-          destination: formData.targetDestination,
-          notes: formData.notes || 'None'
+          quantity: formData.estimatedQuantity,
+          targetDestination: formData.targetDestination,
+          notes: formData.notes
         })
       });
-      const w3Data = await w3Res.json();
-      if (w3Data.success) sent = true;
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) sent = true;
+      }
     } catch (err) {}
 
-    // 2. FormSubmit Fallback
+    // 2. Web3Forms fallback (admin inbox only) if the backend is unreachable
+    if (!sent) {
+      try {
+        const w3Res = await fetch('https://api.web3forms.com/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '2a8d834e-5677-4c4c-b610-6844fe2ba187',
+            from_name: "CEFI Quotes",
+            subject: `📋 [Wholesale Quote] ${formData.companyName || formData.contactPerson} (${formData.productName})`,
+            name: formData.contactPerson,
+            company: formData.companyName,
+            email: formData.email,
+            phone: formData.phone || 'N/A',
+            product: formData.productName,
+            estimated_quantity: formData.estimatedQuantity,
+            destination: formData.targetDestination,
+            notes: formData.notes || 'None'
+          })
+        });
+        const w3Data = await w3Res.json();
+        if (w3Data.success) sent = true;
+      } catch (err) {}
+    }
+
+    // 3. FormSubmit fallback (admin inbox only)
     if (!sent) {
       try {
         await fetch('https://formsubmit.co/ajax/ceylonecofreshinfinity@gmail.com', {
