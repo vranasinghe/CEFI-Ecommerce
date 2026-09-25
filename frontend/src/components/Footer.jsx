@@ -11,23 +11,38 @@ export default function Footer() {
     if (email) {
       let sent = false;
 
-      // 1. Web3Forms (Shows "CEFI Newsletter" as Sender in Gmail)
+      // 1. Backend (Resend) — emails the admin AND sends the subscriber a confirmation.
       try {
-        const w3Res = await fetch('https://api.web3forms.com/submit', {
+        const res = await fetch('/api/newsletter', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({
-            access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '2a8d834e-5677-4c4c-b610-6844fe2ba187',
-            from_name: "CEFI Newsletter",
-            subject: `📩 [Newsletter] New Subscription: ${email}`,
-            email: email,
-            message: `New subscriber email: ${email}`
-          })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
         });
-        if (w3Res.ok) sent = true;
-      } catch (e) {}
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success) sent = true;
+        }
+      } catch (err) {}
 
-      // 2. FormSubmit Fallback
+      // 2. Web3Forms fallback (admin inbox only) if the backend is unreachable
+      if (!sent) {
+        try {
+          const w3Res = await fetch('https://api.web3forms.com/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({
+              access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '2a8d834e-5677-4c4c-b610-6844fe2ba187',
+              from_name: "CEFI Newsletter",
+              subject: `📩 [Newsletter] New Subscription: ${email}`,
+              email: email,
+              message: `New subscriber email: ${email}`
+            })
+          });
+          if (w3Res.ok) sent = true;
+        } catch (e) {}
+      }
+
+      // 3. FormSubmit fallback (admin inbox only)
       if (!sent) {
         try {
           await fetch('https://formsubmit.co/ajax/ceylonecofreshinfinity@gmail.com', {

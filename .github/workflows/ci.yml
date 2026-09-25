@@ -13,11 +13,11 @@ jobs:
       run:
         working-directory: ./frontend
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18.x'
+          node-version: '22.x'
           cache: 'npm'
           cache-dependency-path: './frontend/package-lock.json'
       - run: npm ci
@@ -29,11 +29,30 @@ jobs:
       run:
         working-directory: ./backend
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18.x'
+          node-version: '22.x'
           cache: 'npm'
           cache-dependency-path: './backend/package-lock.json'
       - run: npm ci
+
+  # Fails the PR / push if the new commits ADD a password, API key or .env
+  # file. Only added lines are scanned, so history before this job existed
+  # (e.g. commit d3b195b) doesn't fail every run.
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+      - name: Scan pull request changes
+        if: github.event_name == 'pull_request'
+        run: node scripts/check-secrets.js --range "origin/${{ github.base_ref }}...${{ github.sha }}"
+      - name: Scan pushed commits
+        if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
+        run: node scripts/check-secrets.js --range "${{ github.event.before }}..${{ github.sha }}"

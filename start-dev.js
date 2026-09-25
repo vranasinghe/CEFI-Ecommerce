@@ -25,10 +25,15 @@ function pipeOutput(child, name, colorCode) {
 }
 
 // 1. Start Backend (Express server)
+// PORT is pinned to the Vite proxy target (frontend/vite.config.js → :5000).
+// Without this, a PORT inherited from the parent shell or launcher (e.g. 3001)
+// wins over backend/.env — dotenv never overrides an existing variable — and
+// every /api call from the site fails with ECONNREFUSED, so no products load.
+const BACKEND_PORT = '5000';
 const backendDir = path.join(__dirname, 'backend');
 const backend = spawn(process.execPath, ['server.js'], {
   cwd: backendDir,
-  env,
+  env: { ...env, PORT: BACKEND_PORT },
   stdio: ['pipe', 'pipe', 'pipe']
 });
 pipeOutput(backend, 'BACKEND', '34'); // Blue

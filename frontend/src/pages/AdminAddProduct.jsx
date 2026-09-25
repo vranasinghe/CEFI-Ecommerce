@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, Loader2, ImagePlus } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { authFetch } from '../utils/authFetch';
 
 export default function AdminAddProduct() {
   const navigate = useNavigate();
@@ -67,7 +68,7 @@ export default function AdminAddProduct() {
     };
 
     try {
-      const response = await fetch('/api/products', {
+      const response = await authFetch('/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

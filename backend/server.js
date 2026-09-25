@@ -5,18 +5,24 @@ const fs = require('fs');
 const nodemailer = require('nodemailer');
 const { Resend } = require('resend');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
-const { requireAuth } = require('./middleware/auth');
+const { requireAuth, requireAdmin, isAdminUser } = require('./middleware/auth');
 const { sanitizeText, sanitizeHtml, sanitizeHeader, isValidEmail, isValidString } = require('./lib/sanitize');
 require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
 const { sendOrderEmails } = require('./lib/order-email-service');
+const { globalExceptionHandler, notFoundHandler } = require('./lib/error-handler');
 
 // ── CRITICAL SECURITY: No hardcoded credentials. Fail loudly if env vars missing.
 const EMAIL_USER = process.env.EMAIL_USER;
 const EMAIL_PASS = process.env.EMAIL_PASS;
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'CEFI Notifications <onboarding@resend.dev>';
+// Bare address of the verified sender ("CEFI Orders <orders@x.com>" → "orders@x.com"),
+// so each form can send under its own display name from the same verified domain.
+const RESEND_FROM_ADDRESS = (RESEND_FROM_EMAIL.match(/<([^>]+)>/) || [null, RESEND_FROM_EMAIL])[1].trim();
+// Internal inbox for contact / quote / newsletter alerts — same inbox as order alerts.
+const ADMIN_INBOX = process.env.ADMIN_EMAIL || EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
 
 if (!EMAIL_USER || !EMAIL_PASS) {
   console.warn('⚠️  SECURITY WARNING: EMAIL_USER or EMAIL_PASS not set in environment. Email via SMTP is disabled.');
@@ -61,84 +67,84 @@ if (EMAIL_USER && EMAIL_PASS) {
   });
 }
 
-// Helper to send individual message via Resend
-async function sendViaResend(options) {
-  if (!resendClient) return { error: { message: 'Resend not initialized' } };
-  return await resendClient.emails.send({
-    from: RESEND_FROM_EMAIL,
-    to: options.to,
-    reply_to: options.replyTo || options.reply_to || undefined,
-    subject: options.subject,
-    html: options.html,
-    text: options.text || undefined
-  });
-}
+// Sends one message. Resend (verified domain) first; Gmail SMTP only if Resend
+// is unconfigured or rejects the send. Never throws — resolves to true/false.
+// options: { fromName, to, replyTo, subject, html, text }
+async function sendOneEmail(label, options) {
+  const fromName = options.fromName || 'Ceylon Eco Fresh Infinity';
 
-// Helper to send admin and customer emails concurrently (Smart Hybrid Dual Send)
-async function sendDualEmails(adminOptions, customerOptions) {
-  let adminSent = false;
-  let customerSent = false;
-
-  // ── 1. Dispatch Admin Notification via Resend (Fast & Serverless Ready) ─────
   if (resendClient) {
     try {
-      const adminRes = await sendViaResend(adminOptions);
-      if (adminRes && !adminRes.error) {
-        adminSent = true;
-        console.log(`✅ [Resend] Admin notification sent to ${adminOptions.to} (ID: ${adminRes.data?.id || 'ok'})`);
-      } else {
-        console.warn(`⚠️ [Resend] Admin send notice:`, adminRes?.error?.message || 'Unknown error');
+      const { data, error } = await resendClient.emails.send({
+        from: `${fromName} <${RESEND_FROM_ADDRESS}>`,
+        to: options.to,
+        replyTo: options.replyTo || undefined,
+        subject: options.subject,
+        html: options.html,
+        text: options.text || undefined
+      });
+      if (!error) {
+        console.log(`✅ [Resend:${label}] sent to ${options.to} (id: ${data?.id || 'n/a'})`);
+        return true;
       }
+      console.warn(`⚠️ [Resend:${label}] ${error.message || 'send rejected'}`);
     } catch (err) {
-      console.warn(`⚠️ [Resend] Admin send exception:`, err.message);
+      console.warn(`⚠️ [Resend:${label}] exception: ${err.message}`);
     }
   }
 
-  // If Admin not sent via Resend, fallback to SMTP
-  if (!adminSent && mailTransporter) {
+  if (mailTransporter) {
     try {
-      const info = await mailTransporter.sendMail(adminOptions);
-      adminSent = true;
-      console.log(`✅ [Nodemailer] Admin notification sent via SMTP to ${adminOptions.to} (${info.messageId})`);
+      const info = await mailTransporter.sendMail({
+        from: `"${fromName}" <${EMAIL_USER}>`,
+        to: options.to,
+        replyTo: options.replyTo || undefined,
+        subject: options.subject,
+        html: options.html,
+        text: options.text || undefined
+      });
+      console.log(`✅ [SMTP:${label}] sent to ${options.to} (${info.messageId})`);
+      return true;
     } catch (smtpErr) {
-      console.error(`❌ [Nodemailer] Admin SMTP error:`, smtpErr.message);
+      console.error(`❌ [SMTP:${label}] ${smtpErr.message}`);
     }
   }
 
-  // ── 2. Dispatch Customer Confirmation ────────────────────────────────────────
-  if (customerOptions && customerOptions.to && customerOptions.to !== adminOptions.to) {
-    // A. First try Resend (succeeds if custom domain verified or account email)
-    if (resendClient) {
-      try {
-        const custRes = await sendViaResend(customerOptions);
-        if (custRes && !custRes.error) {
-          customerSent = true;
-          console.log(`✅ [Resend] Customer confirmation sent to ${customerOptions.to} (ID: ${custRes.data?.id || 'ok'})`);
-        } else {
-          console.log(`ℹ️ [Resend] Customer domain not yet verified in Resend. Falling back to Gmail SMTP for customer...`);
-        }
-      } catch (err) {
-        console.log(`ℹ️ [Resend] Customer send notice: ${err.message}. Routing to Gmail SMTP...`);
-      }
-    }
+  return false;
+}
 
-    // B. If Resend cannot send to external customer (onboarding@resend.dev restriction), send via Gmail SMTP!
-    if (!customerSent && mailTransporter) {
-      try {
-        const custInfo = await mailTransporter.sendMail(customerOptions);
-        customerSent = true;
-        console.log(`✅ [Nodemailer] Customer confirmation sent via Gmail SMTP to ${customerOptions.to} (${custInfo.messageId})`);
-      } catch (smtpErr) {
-        console.warn(`⚠️ [Nodemailer] Customer SMTP error:`, smtpErr.message);
-      }
-    }
-  }
+// Sends the admin alert and the customer acknowledgement concurrently.
+// customerOptions may be null (e.g. diagnostic sends).
+async function sendDualEmails(adminOptions, customerOptions) {
+  const wantsCustomer = Boolean(customerOptions && customerOptions.to && customerOptions.to !== adminOptions.to);
+
+  const [adminSent, customerSent] = await Promise.all([
+    sendOneEmail('admin', adminOptions),
+    wantsCustomer ? sendOneEmail('customer', customerOptions) : Promise.resolve(false)
+  ]);
 
   return {
-    success: adminSent || customerSent,
+    success: adminSent && (!wantsCustomer || customerSent),
+    method: resendClient ? 'resend' : 'smtp',
     adminSent,
-    customerSent: customerOptions ? customerSent : true
+    customerSent
   };
+}
+
+// Admin-only last resort for form leads: if neither Resend nor SMTP reached the
+// inbox, push the submission through FormSubmit so the enquiry isn't lost.
+async function sendAdminViaFormSubmit(payload) {
+  try {
+    const res = await fetch(`https://formsubmit.co/ajax/${ADMIN_INBOX}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('❌ [FormSubmit] fallback failed:', err.message);
+    return false;
+  }
 }
 
 // Try to load multer (for file uploads)
@@ -168,50 +174,98 @@ try {
 app.use(helmet());
 app.use(helmet.crossOriginResourcePolicy({ policy: "cross-origin" }));
 
+// Vercel sets x-real-ip to the client IP; locally req.ip is already the client.
+// Both limiters must key on the real client, or every visitor shares one bucket
+// behind the proxy and one abuser can lock the whole site out.
+const clientIpKey = (req) => ipKeyGenerator(req.headers['x-real-ip'] || req.ip || '');
+
 // Rate Limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: clientIpKey,
 });
 app.use(limiter);
 
+// Public forms email whatever address is typed in, from our verified domain.
+// A tight per-IP cap stops them being used to spam third parties (which would
+// also burn the domain's sending reputation).
+const formLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: clientIpKey,
+  message: { success: false, message: 'Too many submissions. Please wait a few minutes and try again.' }
+});
+
 // HIGH FIX: Tight CORS — only allow known frontend origins
+// Origins are normalised before comparison: an env value with a stray space,
+// trailing slash or different letter case must not silently block the site.
+const normaliseOrigin = (value) => String(value || '').trim().replace(/\/+$/, '').toLowerCase();
+
 const allowedOrigins = [
-  process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/\/$/, '') : null,
-  process.env.FRONTEND_URL_WWW ? process.env.FRONTEND_URL_WWW.replace(/\/$/, '') : null,
+  process.env.FRONTEND_URL,
+  process.env.FRONTEND_URL_WWW,
   process.env.NODE_ENV !== 'production' ? 'http://localhost:3000' : null,
   // Vite dev server port (frontend/vite.config.js). Without this, the checkout
   // POST is CORS-rejected locally and only the admin-side fallback email fires.
   process.env.NODE_ENV !== 'production' ? 'http://localhost:3001' : null,
   process.env.NODE_ENV !== 'production' ? 'http://localhost:5173' : null,
-].filter(Boolean);
+].map(normaliseOrigin).filter(Boolean);
 
-app.use(cors({
-  origin: (origin, callback) => {
-    // If no origins configured (FRONTEND_URL missing), allow all — open until env vars set
-    if (allowedOrigins.length === 0) {
-      callback(null, true);
-      return;
-    }
-    // Allow server-to-server (no origin) and whitelisted origins
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error(`CORS policy: origin '${origin}' is not allowed`));
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
+/**
+ * True when the browser's Origin is this same deployment. On Vercel the
+ * frontend and /api are served from one domain, so these requests are not
+ * cross-origin at all and must never depend on FRONTEND_URL matching exactly.
+ * (Browsers send Origin on same-origin POSTs, which is why checkout broke
+ * while GET-only pages kept working.)
+ */
+function isSameOrigin(req, origin) {
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '')
+    .split(',')[0].trim().toLowerCase();
+  if (!host) return false;
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}
+
+app.use(cors((req, callback) => {
+  const rawOrigin = req.headers.origin;
+  const origin = normaliseOrigin(rawOrigin);
+
+  const allowed =
+    !rawOrigin ||                         // server-to-server / curl
+    allowedOrigins.includes(origin) ||    // explicitly whitelisted
+    isSameOrigin(req, rawOrigin) ||       // same deployment
+    // Unconfigured allowlist: open only outside production. In production a
+    // missing FRONTEND_URL must not silently switch the whitelist off.
+    (allowedOrigins.length === 0 && process.env.NODE_ENV !== 'production');
+
+  if (!allowed) {
+    const err = new Error(`CORS policy: origin '${rawOrigin}' is not allowed`);
+    err.status = 403;
+    err.isCorsRejection = true;
+    return callback(err);
+  }
+
+  callback(null, {
+    origin: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  });
 }));
 app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 app.use('/uploads', express.static(uploadsDir));
 
-// ── Debug / Health Check (safe — no secrets exposed) ────────────────────────
-app.get('/api/debug', (req, res) => {
+// ── Debug: deployment config (admin-only — reveals env layout and origins) ──
+app.get('/api/debug', requireAdmin, (req, res) => {
   res.json({
     status: 'ok',
     supabaseConnected: !!supabase,
@@ -247,8 +301,8 @@ const localQuotes = [];
 const localOrders = [];
 
 // ── Email Diagnostic Test Endpoint ───────────────────────────────────────────
-// CRITICAL FIX: requireAuth added — prevents spam relay abuse
-app.get('/api/test-email', requireAuth, async (req, res) => {
+// Admin-only: sends to any ?to= address, so a customer login must not reach it
+app.get('/api/test-email', requireAdmin, async (req, res) => {
   const targetEmail = req.query.to || process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
   console.log(`🧪 Diagnostic Test Email requested for: ${targetEmail}`);
 
@@ -275,6 +329,23 @@ app.get('/api/test-email', requireAuth, async (req, res) => {
     smtpConfigured: Boolean(mailTransporter),
     resendFrom: RESEND_FROM_EMAIL,
     dispatchResult
+  });
+});
+
+// ── Current user / admin status ───────────────────────────────────────────────
+// The single source of truth for "is this user an admin" is ADMIN_EMAILS /
+// app_metadata.role on the backend (see middleware/auth.js). The frontend
+// never hardcodes an admin email — it asks here instead, every time it needs
+// to know, so a tampered localStorage value can never grant admin UI access.
+app.get('/api/auth/me', requireAuth, (req, res) => {
+  res.json({
+    success: true,
+    user: {
+      id: req.user.id,
+      email: req.user.email,
+      emailConfirmed: Boolean(req.user.email_confirmed_at),
+      isAdmin: isAdminUser(req.user),
+    }
   });
 });
 
@@ -395,7 +466,7 @@ app.get('/api/catalog-profile', (req, res) => {
   return res.json(currentCatalogProfile || defaultCatalogProfile);
 });
 
-app.post('/api/catalog-profile', requireAuth, (req, res) => {
+app.post('/api/catalog-profile', requireAdmin, (req, res) => {
   try {
     const updated = req.body;
     if (!updated || typeof updated !== 'object') {
@@ -409,7 +480,7 @@ app.post('/api/catalog-profile', requireAuth, (req, res) => {
   }
 });
 
-app.put('/api/catalog-profile', requireAuth, (req, res) => {
+app.put('/api/catalog-profile', requireAdmin, (req, res) => {
   try {
     const updated = req.body;
     if (!updated || typeof updated !== 'object') {
@@ -478,7 +549,7 @@ app.get('/api/products/:slug', async (req, res) => {
 
 // ── Products: POST (Add new) ──────────────────────────────────────────────────
 // CRITICAL FIX: All product write endpoints now require authentication
-app.post('/api/products', requireAuth, async (req, res) => {
+app.post('/api/products', requireAdmin, async (req, res) => {
   const { name, slug, price, short_description, full_description, images, category_slug, is_wholesale_only, is_featured, variants } = req.body;
   if (!name || !slug || !category_slug) {
     return res.status(400).json({ success: false, message: 'Missing required fields.' });
@@ -504,7 +575,7 @@ app.post('/api/products', requireAuth, async (req, res) => {
       const { data, error } = await supabase.from('products').insert([payload]).select();
       if (error) {
         console.error('Supabase insert error:', error.message);
-        return res.status(500).json({ success: false, message: error.message });
+        return res.status(500).json({ success: false, message: 'Could not save the product. Please try again.' });
       }
       if (process.env.NODE_ENV !== 'production') console.log('📦 Product Added to Supabase:', payload.name);
       return res.json({ success: true, message: 'Product added!', product: data[0] });
@@ -518,7 +589,7 @@ app.post('/api/products', requireAuth, async (req, res) => {
   return res.json({ success: true, message: 'Product added!', product: payload });
 });
 
-app.put('/api/products/:id', requireAuth, async (req, res) => {
+app.put('/api/products/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
   const updates = { ...req.body };
   delete updates.id; // don't update ID
@@ -555,7 +626,7 @@ app.put('/api/products/:id', requireAuth, async (req, res) => {
       const { data, error } = await query.select();
       if (error) {
         console.error('Supabase update error:', error.message);
-        return res.status(500).json({ success: false, message: error.message });
+        return res.status(500).json({ success: false, message: 'Could not update the product. Please try again.' });
       }
       if (data && data.length > 0) {
         console.log('✏️ Product Updated in Supabase:', sanitized.name || id);
@@ -586,7 +657,7 @@ app.put('/api/products/:id', requireAuth, async (req, res) => {
 });
 
 // ── Products: DELETE ──────────────────────────────────────────────────────────
-app.delete('/api/products/:id', requireAuth, async (req, res) => {
+app.delete('/api/products/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -601,7 +672,7 @@ app.delete('/api/products/:id', requireAuth, async (req, res) => {
       const { error } = await query;
       if (error) {
         console.error('Supabase delete error:', error.message);
-        return res.status(500).json({ success: false, message: error.message });
+        return res.status(500).json({ success: false, message: 'Could not delete the product. Please try again.' });
       }
       console.log('🗑️ Product Deleted from Supabase:', id);
       return res.json({ success: true, message: 'Product deleted!' });
@@ -625,8 +696,8 @@ try {
   console.warn('⚠️ Image processing libs unavailable (sharp not built for this platform):', e.message);
 }
 
-// MEDIUM FIX: requireAuth prevents storage quota exhaustion by anonymous users
-app.post('/api/upload', requireAuth, (req, res) => {
+// Admin-only: prevents storage quota exhaustion and catalogue image tampering
+app.post('/api/upload', requireAdmin, (req, res) => {
   if (!upload) {
     return res.status(500).json({ success: false, message: 'Image upload not available. Run: npm install multer in the backend folder.' });
   }
@@ -748,7 +819,7 @@ app.get('/api/blog/:slug', async (req, res) => {
 
 // ── Blog: POST (Create New Article) ──────────────────────────────────────────
 // CRITICAL FIX: All blog write endpoints now require authentication
-app.post('/api/blog', requireAuth, async (req, res) => {
+app.post('/api/blog', requireAdmin, async (req, res) => {
   const { title, slug, cover_image, excerpt, content, author, category, read_time_min } = req.body;
   if (!title || !content) {
     return res.status(400).json({ success: false, message: 'Title and content are required.' });
@@ -792,7 +863,7 @@ app.post('/api/blog', requireAuth, async (req, res) => {
 });
 
 // ── Blog: PUT (Update Article) ────────────────────────────────────────────────
-app.put('/api/blog/:id', requireAuth, async (req, res) => {
+app.put('/api/blog/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
   const { title, slug, cover_image, excerpt, content, author, category, read_time_min } = req.body;
 
@@ -832,7 +903,7 @@ app.put('/api/blog/:id', requireAuth, async (req, res) => {
 });
 
 // ── Blog: DELETE Article ──────────────────────────────────────────────────────
-app.delete('/api/blog/:id', requireAuth, async (req, res) => {
+app.delete('/api/blog/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
   const currentBlogs = getStoredBlogs();
   const filtered = currentBlogs.filter(b => b.id !== id && b.slug !== id);
@@ -852,7 +923,7 @@ app.delete('/api/blog/:id', requireAuth, async (req, res) => {
 
 // ── Contact / Quotes / Orders ─────────────────────────────────────────────────
 async function sendContactEmail(record) {
-  const targetEmail = process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
+  const targetEmail = ADMIN_INBOX;
   const { name, email, phone, subject, message } = record;
   const emailSubject = `📬 New Contact Inquiry: ${subject || 'General Inquiry'} - from ${name}`;
 
@@ -883,11 +954,12 @@ ${message}
     </div>
   `;
 
-  // 1. Send via Persistent SMTP
-  if (mailTransporter) {
+  // 1. Resend (verified domain), with Gmail SMTP as a per-message fallback
+  let customerSent = false;
+  if (resendClient || mailTransporter) {
     try {
       const adminOptions = {
-        from: `"CEFI Contact Form" <${EMAIL_USER.replace('@', '+website@')}>`,
+        fromName: 'CEFI Contact Form',
         to: targetEmail,
         replyTo: email,
         subject: emailSubject,
@@ -896,7 +968,8 @@ ${message}
       };
 
       const customerOptions = (email && email !== targetEmail) ? {
-        from: `"Ceylon Eco Fresh Infinity" <${EMAIL_USER}>`,
+        fromName: 'Ceylon Eco Fresh Infinity',
+        replyTo: targetEmail,
         to: email,
         subject: `✅ We received your message, ${name.split(' ')[0]}! — CEFI`,
         text: `Dear ${name},\n\nThank you for contacting Ceylon Eco Fresh Infinity. We have received your message regarding "${subject}" and our team will respond within 24 hours.\n\nFor urgent matters, contact us at +94 714 634 485.\n\nBest regards,\nCeylon Eco Fresh Infinity Team`,
@@ -923,45 +996,29 @@ ${message}
       } : null;
 
       const result = await sendDualEmails(adminOptions, customerOptions);
-      if (result.success) return { success: true, method: 'smtp' };
+      customerSent = result.customerSent;
+      if (result.adminSent) return result;
     } catch (err) {
-      console.warn('⚠️ [Nodemailer] Contact email failed:', err.message);
+      console.warn('⚠️ [Email] Contact email failed:', err.message);
     }
   }
 
-  // 2. Direct HTTP email delivery fallback to target inbox
-  try {
-    const payload = {
-      _subject: emailSubject,
-      _replyto: email,
-      name,
-      email,
-      phone: phone || 'Not provided',
-      subject: subject || 'General Inquiry',
-      message,
-      submitted_at: new Date().toLocaleString()
-    };
-
-    const res = await fetch(`https://formsubmit.co/ajax/${targetEmail}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    const resData = await res.json();
-    console.log(`✅ [Email Dispatcher] Contact inquiry delivered to ${targetEmail}:`, resData);
-    return { success: true, method: 'formsubmit' };
-  } catch (apiErr) {
-    console.error(`❌ [Email Dispatcher] Error delivering contact email:`, apiErr.message);
-    return { success: true, method: 'recorded' };
-  }
+  // 2. Admin-only fallback so the enquiry still reaches the inbox
+  const delivered = await sendAdminViaFormSubmit({
+    _subject: emailSubject,
+    _replyto: email,
+    name,
+    email,
+    phone: phone || 'Not provided',
+    subject: subject || 'General Inquiry',
+    message,
+    submitted_at: new Date().toLocaleString()
+  });
+  return { success: delivered, method: 'formsubmit', adminSent: delivered, customerSent };
 }
 
 // ── Contact Route (POST /api/contact) ─────────────────────────────────────────
-app.post('/api/contact', async (req, res) => {
+app.post('/api/contact', formLimiter, async (req, res) => {
   const { name, email, phone, subject, message } = req.body;
 
   // MEDIUM FIX: Strict input validation with email format check and length caps
@@ -988,16 +1045,20 @@ app.post('/api/contact', async (req, res) => {
     console.log(`📬 New Contact Message from ${record.name}`);
   }
   const dispatchResult = await sendContactEmail(record);
+  if (!dispatchResult.adminSent) {
+    return res.status(502).json({ success: false, message: 'We could not deliver your message right now. Please try again.', dispatch: dispatchResult });
+  }
   return res.json({
     success: true,
     message: 'Your message has been sent to Ceylon Eco Fresh Infinity!',
+    customerEmailed: dispatchResult.customerSent,
     dispatch: dispatchResult
   });
 });
 
 // ── Newsletter Route (POST /api/newsletter) ──────────────────────────────────
 async function sendNewsletterEmail(email) {
-  const targetEmail = process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
+  const targetEmail = ADMIN_INBOX;
   const emailSubject = `📩 New Newsletter Subscriber: ${email}`;
 
   const htmlContent = `
@@ -1019,10 +1080,11 @@ async function sendNewsletterEmail(email) {
     </div>
   `;
 
-  if (mailTransporter) {
+  let customerSent = false;
+  if (resendClient || mailTransporter) {
     try {
       const adminOptions = {
-        from: `"CEFI Newsletter" <${EMAIL_USER.replace('@', '+website@')}>`,
+        fromName: 'CEFI Newsletter',
         to: targetEmail,
         replyTo: email,
         subject: emailSubject,
@@ -1031,7 +1093,8 @@ async function sendNewsletterEmail(email) {
       };
 
       const customerOptions = (email && email !== targetEmail) ? {
-        from: `"Ceylon Eco Fresh Infinity" <${EMAIL_USER}>`,
+        fromName: 'Ceylon Eco Fresh Infinity',
+        replyTo: targetEmail,
         to: email,
         subject: `✅ Welcome to the CEFI Newsletter!`,
         text: `Thank you for subscribing to the Ceylon Eco Fresh Infinity newsletter!`,
@@ -1052,32 +1115,24 @@ async function sendNewsletterEmail(email) {
       } : null;
 
       const result = await sendDualEmails(adminOptions, customerOptions);
-      if (result.success) return { success: true, method: 'smtp' };
+      customerSent = result.customerSent;
+      if (result.adminSent) return result;
     } catch (err) {
-      console.warn('⚠️ [Nodemailer] Newsletter email failed:', err.message);
+      console.warn('⚠️ [Email] Newsletter email failed:', err.message);
     }
   }
 
-  // Fallback
-  try {
-    const payload = {
-      _subject: emailSubject,
-      _replyto: email,
-      email,
-      subscribed_at: new Date().toLocaleString()
-    };
-    await fetch(`https://formsubmit.co/ajax/${targetEmail}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    return { success: true, method: 'formsubmit' };
-  } catch (apiErr) {
-    return { success: true, method: 'recorded' };
-  }
+  // Admin-only fallback
+  const delivered = await sendAdminViaFormSubmit({
+    _subject: emailSubject,
+    _replyto: email,
+    email,
+    subscribed_at: new Date().toLocaleString()
+  });
+  return { success: delivered, method: 'formsubmit', adminSent: delivered, customerSent };
 }
 
-app.post('/api/newsletter', async (req, res) => {
+app.post('/api/newsletter', formLimiter, async (req, res) => {
   const { email } = req.body;
 
   // MEDIUM FIX: Email format validation
@@ -1089,16 +1144,20 @@ app.post('/api/newsletter', async (req, res) => {
     console.log(`📬 New Newsletter Subscriber`);
   }
   const dispatchResult = await sendNewsletterEmail(email.trim().toLowerCase());
+  if (!dispatchResult.adminSent) {
+    return res.status(502).json({ success: false, message: 'We could not deliver your subscription right now. Please try again.', dispatch: dispatchResult });
+  }
   return res.json({
     success: true,
     message: 'Successfully subscribed to the newsletter!',
+    customerEmailed: dispatchResult.customerSent,
     dispatch: dispatchResult
   });
 });
 
 // ── Quote Request Email Delivery Function ────────────────────────────────────
 async function sendQuoteEmail(record) {
-  const targetEmail = process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
+  const targetEmail = ADMIN_INBOX;
   const { name, company, product, quantity, targetDestination, email, phone, notes } = record;
   const emailSubject = `📋 New Wholesale Quote Request: ${company || name} (${product})`;
 
@@ -1133,11 +1192,12 @@ ${notes}
     </div>
   `;
 
-  // 1. Send via Persistent SMTP
-  if (mailTransporter) {
+  // 1. Resend (verified domain), with Gmail SMTP as a per-message fallback
+  let customerSent = false;
+  if (resendClient || mailTransporter) {
     try {
       const adminOptions = {
-        from: `"CEFI Export Desk" <${EMAIL_USER.replace('@', '+website@')}>`,
+        fromName: 'CEFI Export Desk',
         to: targetEmail,
         replyTo: email,
         subject: emailSubject,
@@ -1146,7 +1206,8 @@ ${notes}
       };
 
       const customerOptions = (email && email !== targetEmail) ? {
-        from: `"Ceylon Eco Fresh Infinity" <${EMAIL_USER}>`,
+        fromName: 'Ceylon Eco Fresh Infinity',
+        replyTo: targetEmail,
         to: email,
         subject: `✅ Quote Request Received — ${product} | CEFI`,
         text: `Dear ${name},\n\nThank you for your quotation request for ${product} (${quantity}) to ${targetDestination}.\n\nOur trade team will respond within 1–2 business days with a detailed proforma invoice.\n\nFor urgent matters, contact us at +94 714 634 485.\n\nBest regards,\nCeylon Eco Fresh Infinity Export Team`,
@@ -1176,48 +1237,32 @@ ${notes}
       } : null;
 
       const result = await sendDualEmails(adminOptions, customerOptions);
-      if (result.success) return { success: true, method: 'smtp' };
+      customerSent = result.customerSent;
+      if (result.adminSent) return result;
     } catch (err) {
-      console.warn('⚠️ [Nodemailer] Quote email failed:', err.message);
+      console.warn('⚠️ [Email] Quote email failed:', err.message);
     }
   }
 
-  // 2. HTTP delivery fallback
-  try {
-    const payload = {
-      _subject: emailSubject,
-      _replyto: email,
-      contact_person: name,
-      company: company || 'Not specified',
-      email,
-      phone: phone || 'Not provided',
-      requested_product: product,
-      quantity,
-      destination: targetDestination,
-      notes: notes || '',
-      submitted_at: new Date().toLocaleString()
-    };
-
-    const res = await fetch(`https://formsubmit.co/ajax/${targetEmail}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-
-    const resData = await res.json();
-    console.log(`✅ [Email Dispatcher] Quote request delivered to ${targetEmail}:`, resData);
-    return { success: true, method: 'formsubmit' };
-  } catch (apiErr) {
-    console.error(`❌ [Email Dispatcher] Error delivering quote email:`, apiErr.message);
-    return { success: true, method: 'recorded' };
-  }
+  // 2. Admin-only fallback so the quote request still reaches the inbox
+  const delivered = await sendAdminViaFormSubmit({
+    _subject: emailSubject,
+    _replyto: email,
+    contact_person: name,
+    company: company || 'Not specified',
+    email,
+    phone: phone || 'Not provided',
+    requested_product: product,
+    quantity,
+    destination: targetDestination,
+    notes: notes || '',
+    submitted_at: new Date().toLocaleString()
+  });
+  return { success: delivered, method: 'formsubmit', adminSent: delivered, customerSent };
 }
 
 // ── Quote Route (POST /api/quotes) ───────────────────────────────────────────
-app.post('/api/quotes', async (req, res) => {
+app.post('/api/quotes', formLimiter, async (req, res) => {
   const { name, company, email, phone, product, quantity, targetDestination, destinationPort, notes, message } = req.body;
 
   // MEDIUM FIX: Strict validation on all quote fields
@@ -1247,17 +1292,21 @@ app.post('/api/quotes', async (req, res) => {
     console.log(`📋 New Quote Request for product from client`);
   }
   const dispatchResult = await sendQuoteEmail(record);
+  if (!dispatchResult.adminSent) {
+    return res.status(502).json({ success: false, message: 'We could not deliver your quote request right now. Please try again.', dispatch: dispatchResult });
+  }
   return res.json({
     success: true,
     message: 'Your quote request has been submitted to Ceylon Eco Fresh Infinity!',
+    customerEmailed: dispatchResult.customerSent,
     dispatch: dispatchResult
   });
 });
 
 // Dead code removed — duplicate /api/newsletter route deleted (security cleanup)
 
-// MEDIUM FIX: requireAuth prevents public PII exposure of all customer orders
-app.get('/api/orders', requireAuth, (req, res) => {
+// Admin-only: every customer's order (name, address, phone) is in this list
+app.get('/api/orders', requireAdmin, (req, res) => {
   return res.json(localOrders);
 });
 
@@ -1268,11 +1317,50 @@ function calculateShipping(subtotal) {
   return subtotal > 100 || subtotal === 0 ? 0 : 15.0;
 }
 
+const MAX_ITEM_QUANTITY = 10000;
+
+/**
+ * Rebuilds the cart from the catalogue: name and unit price come from the
+ * product record, never from the request, so an edited cart (price: 0.01)
+ * cannot change what the order and both emails say is owed.
+ * Returns { items } or { error } when a line is unknown or malformed.
+ */
+async function priceOrderItems(rawItems) {
+  let catalogue = mockData.products;
+  if (supabase) {
+    const { data, error } = await supabase.from('products').select('id, slug, name, price');
+    if (!error && data && data.length > 0) catalogue = data;
+  }
+
+  const items = [];
+  for (const raw of rawItems) {
+    if (!raw || typeof raw !== 'object') return { error: 'Invalid item in cart.' };
+    const product = catalogue.find((p) =>
+      (raw.id != null && String(p.id) === String(raw.id)) ||
+      (raw.slug && p.slug === raw.slug));
+    if (!product) return { error: `"${sanitizeText(String(raw.name || 'An item'), 100)}" is no longer available. Please remove it from your basket.` };
+
+    const quantity = Number(raw.quantity);
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_ITEM_QUANTITY) {
+      return { error: 'Each item quantity must be a whole number between 1 and 10000.' };
+    }
+
+    items.push({
+      id: product.id,
+      slug: product.slug,
+      name: product.name,
+      price: Number(product.price) || 0,
+      quantity,
+    });
+  }
+  return { items };
+}
+
 // requireAuth verifies the Supabase access token and attaches req.user.
 app.post('/api/orders', requireAuth, async (req, res) => {
   // MEDIUM FIX: Remove attacker-controlled targetEmail from req.body
-  const { customer, items, paymentMethod } = req.body;
-  if (!customer || !items || !Array.isArray(items) || items.length === 0) {
+  const { customer, items: rawItems, paymentMethod } = req.body;
+  if (!customer || typeof customer !== 'object' || !Array.isArray(rawItems) || rawItems.length === 0 || rawItems.length > 100) {
     return res.status(400).json({ success: false, message: 'Invalid order data: customer details and items are required.' });
   }
 
@@ -1301,7 +1389,19 @@ app.post('/api/orders', requireAuth, async (req, res) => {
   // This is the FIXED recipient of the "Order Confirmed" internal alert.
   const destinationEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
 
-  const subtotal = items.reduce((sum, item) => sum + (Number(item.price) || 0) * (Number(item.quantity) || 0), 0);
+  let priced;
+  try {
+    priced = await priceOrderItems(rawItems);
+  } catch (err) {
+    console.error(`❌ [Orders] Could not price order for user ${req.user.id}:`, err.message);
+    return res.status(503).json({ success: false, message: 'We could not verify product prices right now. Please try again.' });
+  }
+  if (priced.error) {
+    return res.status(400).json({ success: false, message: priced.error });
+  }
+  const items = priced.items;
+
+  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const shippingCost = calculateShipping(subtotal);
 
   // MEDIUM FIX: Bounded array — cap in-memory store to prevent DoS
@@ -1370,6 +1470,22 @@ app.post('/api/orders', requireAuth, async (req, res) => {
     }
   });
 });
+
+// ── CORS rejection handler ────────────────────────────────────────────────────
+// Without this, a rejected origin surfaces as a generic HTML 500, which the
+// checkout treats as "API down" and silently falls back to admin-only email.
+app.use((err, req, res, next) => {
+  if (err && err.isCorsRejection) {
+    console.warn(`⛔ ${err.message} (allowed: ${allowedOrigins.join(', ') || 'same-origin only — set FRONTEND_URL'})`);
+    return res.status(403).json({ success: false, message: 'Requests from this origin are not allowed.' });
+  }
+  return next(err);
+});
+
+// Unknown API routes get a JSON 404; everything else that throws gets a
+// generic message plus a correlation ID — never a stack trace or file path.
+app.use('/api', notFoundHandler);
+app.use(globalExceptionHandler);
 
 // ── Start Server ──────────────────────────────────────────────────────────────
 // Start Server locally

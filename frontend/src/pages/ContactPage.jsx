@@ -23,32 +23,49 @@ export default function ContactPage() {
 
     let sent = false;
 
-    // 1. Web3Forms (Shows "CEFI Inquiries" as Sender in Gmail)
+    // 1. Backend (Resend) — emails the admin AND sends the customer a confirmation.
     try {
-      const w3Res = await fetch('https://api.web3forms.com/submit', {
+      const res = await fetch('/api/contact', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json'
-        },
-        body: JSON.stringify({
-          access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '2a8d834e-5677-4c4c-b610-6844fe2ba187',
-          from_name: "CEFI Inquiries",
-          subject: `📬 [Inquiry] ${formData.subject || 'General Inquiry'} - from ${formData.name}`,
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone || 'N/A',
-          inquiry_type: formData.subject || 'General Inquiry',
-          message: formData.message,
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
       });
-      const w3Data = await w3Res.json();
-      if (w3Data.success) sent = true;
-    } catch (w3Err) {
-      console.warn('Web3Forms failed, attempting fallback...', w3Err);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) sent = true;
+      }
+    } catch (err) {
+      console.warn('Backend contact API failed, attempting fallback...', err);
     }
 
-    // 2. FormSubmit Fallback
+    // 2. Web3Forms fallback (admin inbox only) if the backend is unreachable
+    if (!sent) {
+      try {
+        const w3Res = await fetch('https://api.web3forms.com/submit', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json'
+          },
+          body: JSON.stringify({
+            access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '2a8d834e-5677-4c4c-b610-6844fe2ba187',
+            from_name: "CEFI Inquiries",
+            subject: `📬 [Inquiry] ${formData.subject || 'General Inquiry'} - from ${formData.name}`,
+            name: formData.name,
+            email: formData.email,
+            phone: formData.phone || 'N/A',
+            inquiry_type: formData.subject || 'General Inquiry',
+            message: formData.message,
+          })
+        });
+        const w3Data = await w3Res.json();
+        if (w3Data.success) sent = true;
+      } catch (w3Err) {
+        console.warn('Web3Forms failed, attempting fallback...', w3Err);
+      }
+    }
+
+    // 3. FormSubmit fallback (admin inbox only)
     if (!sent) {
       try {
         const fsRes = await fetch('https://formsubmit.co/ajax/ceylonecofreshinfinity@gmail.com', {
@@ -66,23 +83,8 @@ export default function ContactPage() {
         const fsData = await fsRes.json();
         if (fsData.success === 'true' || fsData.success === true) sent = true;
       } catch (fsErr) {
-        console.warn('FormSubmit fallback failed, attempting backend...', fsErr);
+        console.warn('FormSubmit fallback failed', fsErr);
       }
-    }
-
-    // 3. Backend API Fallback
-    if (!sent) {
-      try {
-        const res = await fetch('/api/contact', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success) sent = true;
-        }
-      } catch (err) {}
     }
 
 

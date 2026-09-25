@@ -71,7 +71,7 @@ export default function LoginPromptModal({ isOpen, onClose, onSuccess, redirectT
         if (onSuccess) onSuccess();
         if (redirectTo) navigate(redirectTo);
       } else {
-        setError('Authentication failed. Please check your credentials.');
+        setError(res?.error || 'Authentication failed. Please check your credentials.');
       }
     } catch (err) {
       setError('Something went wrong. Please try again.');

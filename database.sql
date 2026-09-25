@@ -45,7 +45,12 @@ ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 -- Allow public read access to product-images bucket
 CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING ( bucket_id = 'product-images' );
 
--- RESTRICT: Only authenticated users (or the service role/admin) can upload, update, delete
-CREATE POLICY "Authenticated Upload" ON storage.objects FOR INSERT TO authenticated WITH CHECK ( bucket_id = 'product-images' );
-CREATE POLICY "Authenticated Update" ON storage.objects FOR UPDATE TO authenticated USING ( bucket_id = 'product-images' );
-CREATE POLICY "Authenticated Delete" ON storage.objects FOR DELETE TO authenticated USING ( bucket_id = 'product-images' );
+-- No insert/update/delete policies on purpose: only the backend writes images,
+-- using the service-role key (which bypasses RLS) after checking admin role.
+-- A policy "TO authenticated" would let any signed-up customer replace them.
+
+-- Catalogue tables: public read, no browser writes (see fix_supabase_security.sql).
+ALTER TABLE products   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public Read Products"   ON products   FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "Public Read Categories" ON categories FOR SELECT TO anon, authenticated USING (true);

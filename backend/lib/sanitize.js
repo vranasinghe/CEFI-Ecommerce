@@ -21,7 +21,9 @@ function stripTagsFallback(value) {
 }
 
 // ── Regex ────────────────────────────────────────────────────────────────────
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+// Quotes, angle brackets and parens are rejected: addresses are interpolated
+// into email HTML (mailto: links) and headers, where they could inject markup.
+const EMAIL_REGEX = /^[^\s@<>"'`()]+@[^\s@<>"'`()]+\.[^\s@<>"'`()]{2,}$/;
 
 /**
  * Sanitize a plain-text field (strips ALL HTML tags).

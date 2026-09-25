@@ -1,17 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { CheckCircle2, Mail, Send, Loader2, Lock, AlertTriangle } from 'lucide-react';
-import emailjs from '@emailjs/browser';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import LoginPromptModal from '../components/LoginPromptModal';
 import supabase from '../utils/supabase';
 
 const COMPANY_ORDER_EMAIL = 'ceylonecofreshinfinity@gmail.com';
-// Same EmailJS credentials used in ContactPage (already verified working)
-const EMAILJS_SERVICE_ID  = 'service_esc398x';
-const EMAILJS_TEMPLATE_ID = 'template_an5f25r';
-const EMAILJS_PUBLIC_KEY  = 'zNFcAnT75D9PGlHIR';
 
 export default function CheckoutPage() {
   const { cart, cartTotal, clearCart } = useCart();
@@ -67,22 +62,12 @@ export default function CheckoutPage() {
       return;
     }
 
-    const orderId = `CEFI-ORD-${Math.floor(100000 + Math.random() * 900000)}`;
-    // Two independent outcomes: the admin alert and the customer confirmation.
-    // The Web3Forms / FormSubmit fallbacks below can only reach the admin, so
-    // collapsing these into one flag is what previously showed a green
-    // "emails sent" panel while the customer received nothing.
-    let adminNotified = false;
-    let customerNotified = false;
-    // True only if the API could not be reached at all. A reachable API that
-    // rejects the order (bad session, unconfirmed email) must NOT fall through
-    // to the admin-only email fallbacks and pretend the order went through.
-    let backendUnreachable = false;
-
-    const itemsSummary = cart.map(item => `• ${item.name} (Qty: ${item.quantity}) - $${(item.price * item.quantity).toFixed(2)}`).join('\n');
-    const itemsLine = cart.map(item => `${item.name} x${item.quantity}`).join(', ');
-
-    // ══ 1. BACKEND API DISPATCH (Generates the Gorgeous Green & Gold HTML Template) ══
+    // ══ Place the order. Resend (via the backend) is the ONLY email channel ══
+    // There is deliberately no browser-side fallback (Web3Forms/FormSubmit):
+    // those could only reach the admin inbox, and they masked backend failures
+    // by making a failed order look placed. If the API fails, the order was not
+    // recorded, so we say so and keep the cart.
+    let apiData;
     try {
       const apiRes = await fetch('/api/orders', {
         method: 'POST',
@@ -91,14 +76,12 @@ export default function CheckoutPage() {
           Authorization: `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
-          orderId, 
-          customer: { ...formData, email: user.email }, 
+          customer: { ...formData, email: user.email },
           items: cart,
-          paymentMethod: formData.paymentMethod || 'Direct Email Order', 
-          targetEmail: COMPANY_ORDER_EMAIL
+          paymentMethod: formData.paymentMethod || 'Direct Email Order'
         })
       });
-      
+
       if (apiRes.status === 401 || apiRes.status === 403) {
         const errData = await apiRes.json().catch(() => ({}));
         setSubmitError(
@@ -110,91 +93,41 @@ export default function CheckoutPage() {
         return; // order not placed — cart is kept
       }
 
-      if (apiRes.status >= 500) backendUnreachable = true;
-
-      if (apiRes.ok) {
-        const apiData = await apiRes.json();
-        if (apiData.success) {
-          // The order is saved. Email delivery is reported separately — a saved
-          // order with a failed email must not show a green success panel.
-          const notifications = apiData.notifications || {};
-          adminNotified = Boolean(notifications.adminEmail);
-          customerNotified = Boolean(notifications.customerEmail);
-          setEmailRecipients({
-            customer: notifications.customerEmail || null,
-            admin: notifications.adminEmail || null
-          });
-          if (!customerNotified) {
-            console.warn('Order saved but the customer confirmation failed:', notifications.detail);
-          }
-        }
+      apiData = await apiRes.json().catch(() => null);
+      if (!apiRes.ok || !apiData?.success) {
+        throw new Error(apiData?.message || `Order API responded ${apiRes.status}`);
       }
     } catch (error) {
-      backendUnreachable = true;
-      console.warn('Backend API order endpoint not reachable, trying Web3Forms fallback...', error);
+      console.error('Order could not be placed:', error);
+      setSubmitError(
+        `We couldn't place your order right now. Nothing has been charged and your basket is saved — please try again in a moment, or contact ${COMPANY_ORDER_EMAIL}.`
+      );
+      setLoading(false);
+      return;
     }
 
-    // ══ 2. WEB3FORMS FALLBACK (admin notification only, API outage only) ══
-    if (!adminNotified && backendUnreachable) {
-      try {
-        const w3Res = await fetch('https://api.web3forms.com/submit', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json'
-          },
-          body: JSON.stringify({
-            access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '2a8d834e-5677-4c4c-b610-6844fe2ba187',
-            from_name: "CEFI Orders",
-            subject: `🛒 [New Order] ${orderId} - from ${formData.name}`,
-            name: formData.name,
-            email: formData.email,
-            phone: formData.phone || 'N/A',
-            delivery_address: `${formData.address}, ${formData.city}, ${formData.postalCode}, ${formData.country}`,
-            order_id: orderId,
-            order_items: itemsLine,
-            total_amount: `$${grandTotal.toFixed(2)}`,
-            payment_method: formData.paymentMethod || 'Direct Email Order',
-            message: `New Order Received!\n\nOrder ID: ${orderId}\nCustomer: ${formData.name} (${formData.email}, ${formData.phone || 'No phone'})\nDelivery Address: ${formData.address}, ${formData.city}, ${formData.postalCode}, ${formData.country}\n\nOrdered Products:\n${itemsSummary}\n\nShipping: $${shippingCost.toFixed(2)}\nGrand Total: $${grandTotal.toFixed(2)}\nPayment Method: ${formData.paymentMethod || 'Direct Email Order'}`
-          })
-        });
-        const w3Data = await w3Res.json();
-        if (w3Data.success) {
-          adminNotified = true; // reaches the company inbox, not the customer
-        }
-      } catch (w3Err) {
-        console.warn('Web3Forms dispatch failed, attempting FormSubmit fallback...', w3Err);
-      }
+    // The order is saved server-side. Email delivery is reported separately —
+    // a saved order whose confirmation failed must not show a green panel.
+    const notifications = apiData.notifications || {};
+    const customerNotified = Boolean(notifications.customerEmail);
+    if (!customerNotified) {
+      console.warn('Order saved but the customer confirmation failed:', notifications.detail);
     }
+    setEmailRecipients({
+      customer: notifications.customerEmail || null,
+      admin: notifications.adminEmail || null
+    });
 
-    // ══ 3. FORMSUBMIT FALLBACK (admin notification only, API outage only) ══
-    if (!adminNotified && backendUnreachable) {
-      try {
-        await fetch(`https://formsubmit.co/ajax/${COMPANY_ORDER_EMAIL}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({
-            _subject: `🛒 [New Order] ${orderId} - from ${formData.name}`,
-            order_id: orderId,
-            customer_name: formData.name,
-            customer_email: formData.email,
-            customer_phone: formData.phone || 'N/A',
-            address: `${formData.address}, ${formData.city}, ${formData.postalCode}, ${formData.country}`,
-            products: itemsSummary,
-            total: `$${grandTotal.toFixed(2)}`
-          })
-        });
-        adminNotified = true; // reaches the company inbox, not the customer
-      } catch (fsErr) {
-        console.error('All order email delivery options failed:', fsErr);
-      }
-    }
-
-    setOrderConfirmed(orderId);
-    // Green panel only when the customer genuinely received their confirmation.
+    // Use the server's order ID so the screen matches the emails exactly.
+    setOrderConfirmed(apiData.orderId);
     setEmailSent(customerNotified);
-    setAdminNotified(adminNotified);
-    setOrderDetails({ orderId, items: cart, total: grandTotal, customer: { ...formData, email: user.email } });
+    setAdminNotified(Boolean(notifications.adminEmail));
+    setOrderDetails({
+      orderId: apiData.orderId,
+      items: cart,
+      total: apiData.totalAmount ?? grandTotal,
+      customer: { ...formData, email: user.email }
+    });
     clearCart();
     setLoading(false);
   };

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Save, Loader2, Upload, X, Plus, ImagePlus, CheckCircle } from 'lucide-react';
+import { authFetch } from '../utils/authFetch';
 
 // Reusable form for both Add and Edit
 export default function AdminProductForm({ mode = 'add' }) {
@@ -87,7 +88,7 @@ export default function AdminProductForm({ mode = 'add' }) {
     const fd = new FormData();
     files.forEach(f => fd.append('images', f));
     try {
-      const res = await fetch('/api/upload', { method: 'POST', body: fd });
+      const res = await authFetch('/api/upload', { method: 'POST', body: fd });
       const data = await res.json();
       if (data.success && data.urls) {
         setFormData(prev => ({ ...prev, images: [...prev.images, ...data.urls] }));
@@ -143,7 +144,7 @@ export default function AdminProductForm({ mode = 'add' }) {
     try {
       const url = isEdit ? `/api/products/${productId || id}` : '/api/products';
       const method = isEdit ? 'PUT' : 'POST';
-      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const res = await authFetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const data = await res.json();
       if (data.success) {
         setSuccess(isEdit ? 'Product updated successfully!' : 'Product added successfully!');

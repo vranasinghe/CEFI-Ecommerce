@@ -59,7 +59,7 @@ export default function AccountPage() {
           navigate('/admin');
         }
       } else {
-        setError('Authentication failed. Please check your credentials.');
+        setError(res?.error || 'Authentication failed. Please check your credentials.');
       }
     } catch (err) {
       setError('Something went wrong. Please try again.');
