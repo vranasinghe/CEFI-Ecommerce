@@ -168,13 +168,20 @@ export const AuthProvider = ({ children }) => {
         }
       });
 
+      // One neutral message whether the address is new or already registered,
+      // so the form can't be used to find out who has an account. Errors
+      // about the password itself or rate limits are safe to show.
+      const neutral = 'If this email can be registered, we have sent a confirmation link. Check your inbox, then sign in.';
       if (error) {
-        return { success: false, error: error.message || 'Sign up failed. Please try again.' };
+        const msg = error.message || '';
+        if (/password/i.test(msg) && !/already/i.test(msg)) return { success: false, error: msg };
+        if (/rate limit|too many/i.test(msg)) return { success: false, error: 'Too many attempts. Please wait a few minutes and try again.' };
+        return { success: false, error: neutral };
       }
 
       // Email confirmation is on: there is no session until the link is clicked.
       if (!data?.session) {
-        return { success: false, error: 'Account created. Check your inbox to confirm your email, then sign in.' };
+        return { success: false, error: neutral };
       }
 
       const mapped = mapSupabaseUser(data.user);

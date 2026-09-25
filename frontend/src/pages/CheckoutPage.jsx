@@ -75,9 +75,19 @@ export default function CheckoutPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`
         },
+        // Exactly the fields the API accepts: it validates strictly, and it
+        // prices items itself, so only product + quantity are sent.
         body: JSON.stringify({
-          customer: { ...formData, email: user.email },
-          items: cart,
+          customer: {
+            name: formData.name,
+            email: user.email,
+            phone: formData.phone,
+            address: formData.address,
+            city: formData.city,
+            postalCode: formData.postalCode,
+            country: formData.country
+          },
+          items: cart.map(({ id, slug, name, quantity }) => ({ id, slug, name, quantity })),
           paymentMethod: formData.paymentMethod || 'Direct Email Order'
         })
       });

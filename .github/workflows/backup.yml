@@ -1,0 +1,68 @@
+name: Nightly encrypted database backup
+
+# The Supabase Free plan has no automated backups (Master-Vault item 73).
+# This exports every CEFI table, encrypts it with BACKUP_ENCRYPTION_KEY and
+# keeps it as a workflow artifact for 30 days. The repo is public, so the
+# artifact is only ever the encrypted file — it is useless without the key.
+#
+# Needs three repository secrets (Settings → Secrets and variables → Actions):
+#   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, BACKUP_ENCRYPTION_KEY
+# Until they exist the job reports "skipped" instead of failing.
+
+on:
+  schedule:
+    - cron: '30 20 * * *' # 02:00 Sri Lanka time (UTC+5:30)
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check secrets are configured
+        id: cfg
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+        run: |
+          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] && [ -n "$BACKUP_ENCRYPTION_KEY" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Backup skipped: add SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and BACKUP_ENCRYPTION_KEY as repository secrets."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.cfg.outputs.ready == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.cfg.outputs.ready == 'true'
+        with:
+          node-version: '22.x'
+
+      - name: Export and encrypt
+        if: steps.cfg.outputs.ready == 'true'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+        run: node scripts/backup-db.js cefi-backup.enc
+
+      # Proves the file can actually be restored (decrypt + integrity check),
+      # without writing anything back.
+      - name: Verify the backup restores (dry run)
+        if: steps.cfg.outputs.ready == 'true'
+        env:
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+        run: node scripts/restore-db.js cefi-backup.enc
+
+      - uses: actions/upload-artifact@v4
+        if: steps.cfg.outputs.ready == 'true'
+        with:
+          name: cefi-backup-${{ github.run_id }}
+          path: cefi-backup.enc
+          retention-days: 30
+          if-no-files-found: error
