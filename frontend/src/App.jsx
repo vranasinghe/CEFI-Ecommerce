@@ -4,6 +4,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import CartDrawer from './components/CartDrawer';
 import QuoteModal from './components/QuoteModal';
+import AdminRoute from './components/AdminRoute';
 
 // Context Providers
 import { CartProvider } from './context/CartContext';
@@ -65,10 +66,11 @@ function MainLayout({ onOpenQuoteModal, quoteModalOpen, setQuoteModalOpen, selec
           {/* OAuth Callback */}
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
-          {/* Admin Routes - full screen Admin Portal */}
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/admin/products/new" element={<AdminProductForm mode="add" />} />
-          <Route path="/admin/products/edit/:id" element={<AdminProductForm mode="edit" />} />
+          {/* Admin Routes - full screen Admin Portal. AdminRoute is a UI gate
+              only; the real enforcement is server-side on every admin API call. */}
+          <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+          <Route path="/admin/products/new" element={<AdminRoute><AdminProductForm mode="add" /></AdminRoute>} />
+          <Route path="/admin/products/edit/:id" element={<AdminRoute><AdminProductForm mode="edit" /></AdminRoute>} />
         </Routes>
       </main>
 

@@ -8,6 +8,7 @@ import {
   X, Check
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { authFetch } from '../utils/authFetch';
 
 const CATEGORY_ICONS = {
   'herbal-leaves':  '🌿',
@@ -129,7 +130,7 @@ export default function AdminDashboard() {
     Promise.all([
       fetch('/api/products').then(r => r.json()),
       fetch('/api/categories').then(r => r.json()),
-      fetch('/api/orders').then(r => r.json()).catch(() => []),
+      authFetch('/api/orders').then(r => r.json()).catch(() => []),
       fetch('/api/catalog-profile').then(r => r.json()).catch(() => {
         try {
           const cached = localStorage.getItem('cefi_catalog_profile');
@@ -156,7 +157,7 @@ export default function AdminDashboard() {
     setSavingCatalog(true);
     try {
       try { localStorage.setItem('cefi_catalog_profile', JSON.stringify(catalogProfile)); } catch {}
-      const res = await fetch('/api/catalog-profile', {
+      const res = await authFetch('/api/catalog-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(catalogProfile)
@@ -213,7 +214,7 @@ export default function AdminDashboard() {
       const url = isNew ? '/api/blog' : `/api/blog/${blogForm.id}`;
       const method = isNew ? 'POST' : 'PUT';
 
-      const res = await fetch(url, {
+      const res = await authFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(blogForm)
@@ -239,7 +240,7 @@ export default function AdminDashboard() {
     if (!post) return;
     setDeletingBlog(true);
     try {
-      const res = await fetch(`/api/blog/${post.id || post.slug}`, { method: 'DELETE' });
+      const res = await authFetch(`/api/blog/${post.id || post.slug}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
         showToast('Blog article deleted');
@@ -263,7 +264,7 @@ export default function AdminDashboard() {
     fd.append('image', file);
 
     try {
-      const res = await fetch('/api/upload', { method: 'POST', body: fd });
+      const res = await authFetch('/api/upload', { method: 'POST', body: fd });
       const data = await res.json();
       if (data.url) {
         setBlogForm(prev => ({ ...prev, cover_image: data.url }));
@@ -306,7 +307,7 @@ export default function AdminDashboard() {
   const handleDeleteProduct = async (product) => {
     setDeleting(true);
     try {
-      const res  = await fetch(`/api/products/${product.id}`, { method: 'DELETE' });
+      const res  = await authFetch(`/api/products/${product.id}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
         setProducts(prev => prev.filter(p => p.id !== product.id));
@@ -585,7 +586,7 @@ export default function AdminDashboard() {
                 Admin Privilege Level
               </span>
               <span className="text-xs text-gray-400 font-mono">
-                {currentUser?.email || 'rodney1st@gmail.com'}
+                {currentUser?.email || 'Signed-in admin'}
               </span>
             </div>
             <h1 className="font-serif font-bold text-2xl text-cefi-earth mt-1">

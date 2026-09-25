@@ -1,36 +1,28 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import supabase from '../utils/supabase';
+import { authFetch } from '../utils/authFetch';
 
 const AuthContext = createContext();
-
-const ADMIN_EMAILS = ['rodney1st@gmail.com', 'admin@cefi.lk'];
-
-const isAdminEmail = (email) => {
-  if (!email) return false;
-  return ADMIN_EMAILS.includes(email.trim().toLowerCase());
-};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  // True once we've asked the backend whether the current session is an
+  // admin (or confirmed there is no session). AdminRoute waits on this so it
+  // never renders admin UI, or bounces a real admin, on a stale guess.
+  const [adminChecked, setAdminChecked] = useState(false);
 
   // ── Bootstrap: read current session on mount + subscribe to auth changes ──
+  // Only a real Supabase session signs someone in. The localStorage copy is a
+  // display cache and is never trusted: anyone can edit it to say role: 'admin'.
   useEffect(() => {
-    // Check saved local user first
-    const savedLocal = localStorage.getItem('cefi_user');
-
-    // Get current Supabase session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        setUser(mapSupabaseUser(session.user));
-      } else if (savedLocal) {
-        try {
-          setUser(JSON.parse(savedLocal));
-        } catch (e) {
-          setUser(null);
-        }
+        applySession(session.user);
       } else {
         setUser(null);
+        setAdminChecked(true);
+        localStorage.removeItem('cefi_user');
       }
       setLoading(false);
     });
@@ -38,18 +30,11 @@ export const AuthProvider = ({ children }) => {
     // Listen for sign-in / sign-out events
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
-        const mapped = mapSupabaseUser(session.user);
-        setUser(mapped);
-        localStorage.setItem('cefi_user', JSON.stringify(mapped));
+        applySession(session.user);
       } else {
-        const saved = localStorage.getItem('cefi_user');
-        if (saved) {
-          try {
-            setUser(JSON.parse(saved));
-          } catch (e) {
-            setUser(null);
-          }
-        }
+        setUser(null);
+        setAdminChecked(true);
+        localStorage.removeItem('cefi_user');
       }
       setLoading(false);
     });
@@ -58,24 +43,61 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // ── Map Supabase user shape to CEFI user shape ─────────────────────────────
+  // No email is treated as "the admin" here. role always starts as
+  // 'customer' — refreshAdminStatus() is the only thing that can upgrade it,
+  // and it does so by asking the backend, which is the only place that reads
+  // ADMIN_EMAILS / app_metadata.role.
   const mapSupabaseUser = (supaUser) => {
     const email = supaUser.email || '';
-    const isAdmin = isAdminEmail(email);
     return {
       id: supaUser.id,
-      email: email,
+      email,
       name:
         supaUser.user_metadata?.full_name ||
         supaUser.user_metadata?.name ||
-        (isAdmin ? 'Rodney (Admin)' : email.split('@')[0]),
+        email.split('@')[0],
       avatar:
         supaUser.user_metadata?.avatar_url ||
         supaUser.user_metadata?.picture ||
         null,
       provider: supaUser.app_metadata?.provider || 'email',
-      role: isAdmin ? 'admin' : 'customer',
+      role: 'customer',
       joinedAt: new Date(supaUser.created_at || Date.now()).toLocaleDateString(),
     };
+  };
+
+  /**
+   * Asks the backend's /api/auth/me whether this session is an admin, and
+   * upgrades the in-memory + cached user if so. Runs on every bootstrap,
+   * auth-state change and successful login/signup, so a session that has
+   * been granted admin server-side (or had it revoked) is reflected within
+   * one round trip — never taken on the client's word.
+   */
+  const refreshAdminStatus = async (mappedUser) => {
+    let finalUser = mappedUser;
+    try {
+      const res = await authFetch('/api/auth/me');
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.user?.isAdmin) {
+          finalUser = { ...mappedUser, role: 'admin' };
+        }
+      }
+    } catch (e) {
+      // Network hiccup: fall back to 'customer'. The backend still enforces
+      // the real admin check on every admin API call regardless of this flag.
+    }
+    setUser(finalUser);
+    localStorage.setItem('cefi_user', JSON.stringify(finalUser));
+    setAdminChecked(true);
+    return finalUser;
+  };
+
+  const applySession = (supaUser) => {
+    const mapped = mapSupabaseUser(supaUser);
+    setUser(mapped);
+    setAdminChecked(false);
+    return refreshAdminStatus(mapped);
   };
 
   // ── OAuth sign-in ──────────────────────────────────────────────────────────
@@ -100,81 +122,42 @@ export const AuthProvider = ({ children }) => {
   };
 
   // ── Email/Password login ───────────────────────────────────────────────────
+  // Failures are failures: no local fallback user and no per-email bypass.
   const login = async (emailInput, passwordInput) => {
     const cleanEmail = (emailInput || '').trim().toLowerCase();
-    const isAdmin = isAdminEmail(cleanEmail);
 
-    // Special check for specified Admin credentials: rodney1st@gmail.com / Lasydog4u@123$
-    if (cleanEmail === 'rodney1st@gmail.com') {
-      const adminUser = {
-        id: 'admin-rodney-001',
-        email: 'rodney1st@gmail.com',
-        name: 'Rodney (Admin)',
-        role: 'admin',
-        provider: 'email',
-        avatar: null,
-        joinedAt: new Date().toLocaleDateString(),
-      };
-      setUser(adminUser);
-      localStorage.setItem('cefi_user', JSON.stringify(adminUser));
-
-      // Attempt Supabase login in background if credentials exist
-      try {
-        await supabase.auth.signInWithPassword({
-          email: cleanEmail,
-          password: passwordInput,
-        });
-      } catch (e) {}
-
-      return { success: true, user: adminUser };
-    }
-
-    // Standard user login via Supabase
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
         password: passwordInput,
       });
 
-      if (error) {
-        // Fallback for local user session
-        const localUser = {
-          id: `usr-${Date.now()}`,
-          email: cleanEmail,
-          name: cleanEmail.split('@')[0].toUpperCase(),
-          role: isAdmin ? 'admin' : 'customer',
-          provider: 'email',
-          joinedAt: new Date().toLocaleDateString(),
+      if (error || !data?.user) {
+        const unconfirmed = /not confirmed/i.test(error?.message || '');
+        return {
+          success: false,
+          error: unconfirmed
+            ? 'Please confirm your email address (check your inbox), then sign in.'
+            : 'Incorrect email or password.',
         };
-        setUser(localUser);
-        localStorage.setItem('cefi_user', JSON.stringify(localUser));
-        return { success: true, user: localUser };
       }
 
       const mapped = mapSupabaseUser(data.user);
       setUser(mapped);
+      setAdminChecked(false);
       localStorage.setItem('cefi_user', JSON.stringify(mapped));
-      return { success: true, user: mapped };
+      // Awaited: callers (e.g. AccountPage) check res.user.role === 'admin'
+      // right after login() resolves, so the admin check must be settled first.
+      const finalUser = await refreshAdminStatus(mapped);
+      return { success: true, user: finalUser };
     } catch (e) {
-      // Local fallback
-      const localUser = {
-        id: `usr-${Date.now()}`,
-        email: cleanEmail,
-        name: cleanEmail.split('@')[0].toUpperCase(),
-        role: isAdmin ? 'admin' : 'customer',
-        provider: 'email',
-        joinedAt: new Date().toLocaleDateString(),
-      };
-      setUser(localUser);
-      localStorage.setItem('cefi_user', JSON.stringify(localUser));
-      return { success: true, user: localUser };
+      return { success: false, error: 'Could not reach the sign-in service. Please try again.' };
     }
   };
 
   // ── Email/Password signup ──────────────────────────────────────────────────
   const signup = async (nameInput, emailInput, passwordInput) => {
     const cleanEmail = (emailInput || '').trim().toLowerCase();
-    const isAdmin = isAdminEmail(cleanEmail);
 
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -186,44 +169,22 @@ export const AuthProvider = ({ children }) => {
       });
 
       if (error) {
-        // Local fallback
-        const localUser = {
-          id: `usr-${Date.now()}`,
-          email: cleanEmail,
-          name: nameInput,
-          role: isAdmin ? 'admin' : 'customer',
-          provider: 'email',
-          joinedAt: new Date().toLocaleDateString(),
-        };
-        setUser(localUser);
-        localStorage.setItem('cefi_user', JSON.stringify(localUser));
-        return { success: true, user: localUser };
+        return { success: false, error: error.message || 'Sign up failed. Please try again.' };
       }
 
-      const mapped = data.user ? mapSupabaseUser(data.user) : {
-        id: `usr-${Date.now()}`,
-        email: cleanEmail,
-        name: nameInput,
-        role: isAdmin ? 'admin' : 'customer',
-        provider: 'email',
-        joinedAt: new Date().toLocaleDateString(),
-      };
+      // Email confirmation is on: there is no session until the link is clicked.
+      if (!data?.session) {
+        return { success: false, error: 'Account created. Check your inbox to confirm your email, then sign in.' };
+      }
+
+      const mapped = mapSupabaseUser(data.user);
       setUser(mapped);
+      setAdminChecked(false);
       localStorage.setItem('cefi_user', JSON.stringify(mapped));
-      return { success: true, user: mapped };
+      const finalUser = await refreshAdminStatus(mapped);
+      return { success: true, user: finalUser };
     } catch (e) {
-      // Local fallback
-      const localUser = {
-        id: `usr-${Date.now()}`,
-        email: cleanEmail,
-        name: nameInput,
-        role: isAdmin ? 'admin' : 'customer',
-        provider: 'email',
-        joinedAt: new Date().toLocaleDateString(),
-      };
-      setUser(localUser);
-      localStorage.setItem('cefi_user', JSON.stringify(localUser));
-      return { success: true, user: localUser };
+      return { success: false, error: 'Could not reach the sign-up service. Please try again.' };
     }
   };
 
@@ -233,6 +194,7 @@ export const AuthProvider = ({ children }) => {
       await supabase.auth.signOut();
     } catch (e) {}
     setUser(null);
+    setAdminChecked(true);
     localStorage.removeItem('cefi_user');
   };
 
@@ -241,6 +203,7 @@ export const AuthProvider = ({ children }) => {
       value={{
         user,
         loading,
+        adminChecked,
         signInWithGoogle,
         signInWithFacebook,
         login,

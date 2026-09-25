@@ -1,108 +1,66 @@
 -- =========================================================================
--- CEFI E-Commerce: Supabase Security Fixes (RLS & Storage Policies)
+-- CEFI E-Commerce: Supabase Security Lock-down (RLS & Storage Policies)
 -- Copy and paste this script into your Supabase Dashboard -> SQL Editor -> Run
+--
+-- Model: the browser (anon key, or a signed-in customer's token) may only
+-- READ the catalogue. Every write goes through the Express API, which checks
+-- the admin role and talks to Supabase with the SERVICE-ROLE key — that key
+-- bypasses RLS, so no write policies are needed (or wanted) here.
+--
+-- BEFORE RUNNING: set SUPABASE_SERVICE_ROLE_KEY on the backend (Vercel ->
+-- Project -> Settings -> Environment Variables) and redeploy. If the backend
+-- is still on the anon key, admin saves will fail once this script runs.
+--
+-- Safe to re-run.
 -- =========================================================================
 
--- 1. Remove all old/conflicting policies automatically
+-- 1. RLS on. With RLS off, the public anon key can write to the table.
+ALTER TABLE public.products   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+
+-- 2. Remove every existing policy on the two catalogue tables (old versions of
+--    this script let any signed-in customer insert/update/delete).
 DO $$
 DECLARE
     pol RECORD;
 BEGIN
-    FOR pol IN (SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND tablename = 'products') LOOP
-        EXECUTE format('DROP POLICY IF EXISTS %I ON public.products', pol.policyname);
-    END LOOP;
-
-    FOR pol IN (SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND tablename = 'categories') LOOP
-        EXECUTE format('DROP POLICY IF EXISTS %I ON public.categories', pol.policyname);
-    END LOOP;
-
-    FOR pol IN (SELECT policyname FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects') LOOP
-        EXECUTE format('DROP POLICY IF EXISTS %I ON storage.objects', pol.policyname);
+    FOR pol IN (SELECT policyname, tablename FROM pg_policies
+                WHERE schemaname = 'public' AND tablename IN ('products', 'categories')) LOOP
+        EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol.policyname, pol.tablename);
     END LOOP;
 END $$;
 
--- 2. Enable Row Level Security (RLS) on tables
-ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
-
--- 3. Products Table RLS Policies:
--- Public can read products
+-- 3. Read-only access for the storefront.
 CREATE POLICY "Public Read Products"
 ON public.products
 FOR SELECT
 TO anon, authenticated
 USING (true);
 
--- Authenticated users (logged-in admins) can insert/update/delete products
-CREATE POLICY "Authenticated Insert Products"
-ON public.products
-FOR INSERT
-TO authenticated
-WITH CHECK (auth.uid() IS NOT NULL);
-
-CREATE POLICY "Authenticated Update Products"
-ON public.products
-FOR UPDATE
-TO authenticated
-USING (auth.uid() IS NOT NULL)
-WITH CHECK (auth.uid() IS NOT NULL);
-
-CREATE POLICY "Authenticated Delete Products"
-ON public.products
-FOR DELETE
-TO authenticated
-USING (auth.uid() IS NOT NULL);
-
--- 4. Categories Table RLS Policies:
--- Public can read categories
 CREATE POLICY "Public Read Categories"
 ON public.categories
 FOR SELECT
 TO anon, authenticated
 USING (true);
 
--- Authenticated users (logged-in admins) can insert/update/delete categories
-CREATE POLICY "Authenticated Insert Categories"
-ON public.categories
-FOR INSERT
-TO authenticated
-WITH CHECK (auth.uid() IS NOT NULL);
-
-CREATE POLICY "Authenticated Update Categories"
-ON public.categories
-FOR UPDATE
-TO authenticated
-USING (auth.uid() IS NOT NULL)
-WITH CHECK (auth.uid() IS NOT NULL);
-
-CREATE POLICY "Authenticated Delete Categories"
-ON public.categories
-FOR DELETE
-TO authenticated
-USING (auth.uid() IS NOT NULL);
-
--- 5. Storage Policies for 'product-images' Bucket
-UPDATE storage.buckets 
-SET public = true 
+-- 4. 'product-images' bucket: public for viewing, written only by the backend.
+--    Only the product-image policies are dropped; other buckets are untouched.
+UPDATE storage.buckets
+SET public = true
 WHERE id = 'product-images';
 
-CREATE POLICY "Authenticated Upload Product Images"
-ON storage.objects
-FOR INSERT
-TO authenticated
-WITH CHECK (bucket_id = 'product-images' AND auth.uid() IS NOT NULL);
+DROP POLICY IF EXISTS "Authenticated Upload Product Images" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated Update Product Images" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated Delete Product Images" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated Upload" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated Update" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated Delete" ON storage.objects;
 
-CREATE POLICY "Authenticated Update Product Images"
-ON storage.objects
-FOR UPDATE
-TO authenticated
-USING (bucket_id = 'product-images' AND auth.uid() IS NOT NULL)
-WITH CHECK (bucket_id = 'product-images' AND auth.uid() IS NOT NULL);
+-- 5. Verify: both rows should show rowsecurity = true, and the only policies
+--    listed should be the two "Public Read" SELECT policies.
+SELECT tablename, rowsecurity FROM pg_tables
+WHERE schemaname = 'public' AND tablename IN ('products', 'categories');
 
-CREATE POLICY "Authenticated Delete Product Images"
-ON storage.objects
-FOR DELETE
-TO authenticated
-USING (bucket_id = 'product-images' AND auth.uid() IS NOT NULL);
-
-
+SELECT tablename, policyname, cmd, roles FROM pg_policies
+WHERE (schemaname = 'public' AND tablename IN ('products', 'categories'))
+   OR (schemaname = 'storage' AND tablename = 'objects');

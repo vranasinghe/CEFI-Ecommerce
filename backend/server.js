@@ -7,10 +7,11 @@ const { Resend } = require('resend');
 const helmet = require('helmet');
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
-const { requireAuth } = require('./middleware/auth');
+const { requireAuth, requireAdmin, isAdminUser } = require('./middleware/auth');
 const { sanitizeText, sanitizeHtml, sanitizeHeader, isValidEmail, isValidString } = require('./lib/sanitize');
 require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
 const { sendOrderEmails } = require('./lib/order-email-service');
+const { globalExceptionHandler, notFoundHandler } = require('./lib/error-handler');
 
 // ── CRITICAL SECURITY: No hardcoded credentials. Fail loudly if env vars missing.
 const EMAIL_USER = process.env.EMAIL_USER;
@@ -173,25 +174,30 @@ try {
 app.use(helmet());
 app.use(helmet.crossOriginResourcePolicy({ policy: "cross-origin" }));
 
+// Vercel sets x-real-ip to the client IP; locally req.ip is already the client.
+// Both limiters must key on the real client, or every visitor shares one bucket
+// behind the proxy and one abuser can lock the whole site out.
+const clientIpKey = (req) => ipKeyGenerator(req.headers['x-real-ip'] || req.ip || '');
+
 // Rate Limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: clientIpKey,
 });
 app.use(limiter);
 
 // Public forms email whatever address is typed in, from our verified domain.
 // A tight per-IP cap stops them being used to spam third parties (which would
-// also burn the domain's sending reputation). Vercel sets x-real-ip to the
-// client IP; locally req.ip is already the client.
+// also burn the domain's sending reputation).
 const formLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => ipKeyGenerator(req.headers['x-real-ip'] || req.ip || ''),
+  keyGenerator: clientIpKey,
   message: { success: false, message: 'Too many submissions. Please wait a few minutes and try again.' }
 });
 
@@ -234,9 +240,11 @@ app.use(cors((req, callback) => {
 
   const allowed =
     !rawOrigin ||                         // server-to-server / curl
-    allowedOrigins.length === 0 ||        // not configured yet: open
     allowedOrigins.includes(origin) ||    // explicitly whitelisted
-    isSameOrigin(req, rawOrigin);         // same deployment
+    isSameOrigin(req, rawOrigin) ||       // same deployment
+    // Unconfigured allowlist: open only outside production. In production a
+    // missing FRONTEND_URL must not silently switch the whitelist off.
+    (allowedOrigins.length === 0 && process.env.NODE_ENV !== 'production');
 
   if (!allowed) {
     const err = new Error(`CORS policy: origin '${rawOrigin}' is not allowed`);
@@ -256,8 +264,8 @@ app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 app.use('/uploads', express.static(uploadsDir));
 
-// ── Debug / Health Check (safe — no secrets exposed) ────────────────────────
-app.get('/api/debug', (req, res) => {
+// ── Debug: deployment config (admin-only — reveals env layout and origins) ──
+app.get('/api/debug', requireAdmin, (req, res) => {
   res.json({
     status: 'ok',
     supabaseConnected: !!supabase,
@@ -293,8 +301,8 @@ const localQuotes = [];
 const localOrders = [];
 
 // ── Email Diagnostic Test Endpoint ───────────────────────────────────────────
-// CRITICAL FIX: requireAuth added — prevents spam relay abuse
-app.get('/api/test-email', requireAuth, async (req, res) => {
+// Admin-only: sends to any ?to= address, so a customer login must not reach it
+app.get('/api/test-email', requireAdmin, async (req, res) => {
   const targetEmail = req.query.to || process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
   console.log(`🧪 Diagnostic Test Email requested for: ${targetEmail}`);
 
@@ -321,6 +329,23 @@ app.get('/api/test-email', requireAuth, async (req, res) => {
     smtpConfigured: Boolean(mailTransporter),
     resendFrom: RESEND_FROM_EMAIL,
     dispatchResult
+  });
+});
+
+// ── Current user / admin status ───────────────────────────────────────────────
+// The single source of truth for "is this user an admin" is ADMIN_EMAILS /
+// app_metadata.role on the backend (see middleware/auth.js). The frontend
+// never hardcodes an admin email — it asks here instead, every time it needs
+// to know, so a tampered localStorage value can never grant admin UI access.
+app.get('/api/auth/me', requireAuth, (req, res) => {
+  res.json({
+    success: true,
+    user: {
+      id: req.user.id,
+      email: req.user.email,
+      emailConfirmed: Boolean(req.user.email_confirmed_at),
+      isAdmin: isAdminUser(req.user),
+    }
   });
 });
 
@@ -441,7 +466,7 @@ app.get('/api/catalog-profile', (req, res) => {
   return res.json(currentCatalogProfile || defaultCatalogProfile);
 });
 
-app.post('/api/catalog-profile', requireAuth, (req, res) => {
+app.post('/api/catalog-profile', requireAdmin, (req, res) => {
   try {
     const updated = req.body;
     if (!updated || typeof updated !== 'object') {
@@ -455,7 +480,7 @@ app.post('/api/catalog-profile', requireAuth, (req, res) => {
   }
 });
 
-app.put('/api/catalog-profile', requireAuth, (req, res) => {
+app.put('/api/catalog-profile', requireAdmin, (req, res) => {
   try {
     const updated = req.body;
     if (!updated || typeof updated !== 'object') {
@@ -524,7 +549,7 @@ app.get('/api/products/:slug', async (req, res) => {
 
 // ── Products: POST (Add new) ──────────────────────────────────────────────────
 // CRITICAL FIX: All product write endpoints now require authentication
-app.post('/api/products', requireAuth, async (req, res) => {
+app.post('/api/products', requireAdmin, async (req, res) => {
   const { name, slug, price, short_description, full_description, images, category_slug, is_wholesale_only, is_featured, variants } = req.body;
   if (!name || !slug || !category_slug) {
     return res.status(400).json({ success: false, message: 'Missing required fields.' });
@@ -550,7 +575,7 @@ app.post('/api/products', requireAuth, async (req, res) => {
       const { data, error } = await supabase.from('products').insert([payload]).select();
       if (error) {
         console.error('Supabase insert error:', error.message);
-        return res.status(500).json({ success: false, message: error.message });
+        return res.status(500).json({ success: false, message: 'Could not save the product. Please try again.' });
       }
       if (process.env.NODE_ENV !== 'production') console.log('📦 Product Added to Supabase:', payload.name);
       return res.json({ success: true, message: 'Product added!', product: data[0] });
@@ -564,7 +589,7 @@ app.post('/api/products', requireAuth, async (req, res) => {
   return res.json({ success: true, message: 'Product added!', product: payload });
 });
 
-app.put('/api/products/:id', requireAuth, async (req, res) => {
+app.put('/api/products/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
   const updates = { ...req.body };
   delete updates.id; // don't update ID
@@ -601,7 +626,7 @@ app.put('/api/products/:id', requireAuth, async (req, res) => {
       const { data, error } = await query.select();
       if (error) {
         console.error('Supabase update error:', error.message);
-        return res.status(500).json({ success: false, message: error.message });
+        return res.status(500).json({ success: false, message: 'Could not update the product. Please try again.' });
       }
       if (data && data.length > 0) {
         console.log('✏️ Product Updated in Supabase:', sanitized.name || id);
@@ -632,7 +657,7 @@ app.put('/api/products/:id', requireAuth, async (req, res) => {
 });
 
 // ── Products: DELETE ──────────────────────────────────────────────────────────
-app.delete('/api/products/:id', requireAuth, async (req, res) => {
+app.delete('/api/products/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -647,7 +672,7 @@ app.delete('/api/products/:id', requireAuth, async (req, res) => {
       const { error } = await query;
       if (error) {
         console.error('Supabase delete error:', error.message);
-        return res.status(500).json({ success: false, message: error.message });
+        return res.status(500).json({ success: false, message: 'Could not delete the product. Please try again.' });
       }
       console.log('🗑️ Product Deleted from Supabase:', id);
       return res.json({ success: true, message: 'Product deleted!' });
@@ -671,8 +696,8 @@ try {
   console.warn('⚠️ Image processing libs unavailable (sharp not built for this platform):', e.message);
 }
 
-// MEDIUM FIX: requireAuth prevents storage quota exhaustion by anonymous users
-app.post('/api/upload', requireAuth, (req, res) => {
+// Admin-only: prevents storage quota exhaustion and catalogue image tampering
+app.post('/api/upload', requireAdmin, (req, res) => {
   if (!upload) {
     return res.status(500).json({ success: false, message: 'Image upload not available. Run: npm install multer in the backend folder.' });
   }
@@ -794,7 +819,7 @@ app.get('/api/blog/:slug', async (req, res) => {
 
 // ── Blog: POST (Create New Article) ──────────────────────────────────────────
 // CRITICAL FIX: All blog write endpoints now require authentication
-app.post('/api/blog', requireAuth, async (req, res) => {
+app.post('/api/blog', requireAdmin, async (req, res) => {
   const { title, slug, cover_image, excerpt, content, author, category, read_time_min } = req.body;
   if (!title || !content) {
     return res.status(400).json({ success: false, message: 'Title and content are required.' });
@@ -838,7 +863,7 @@ app.post('/api/blog', requireAuth, async (req, res) => {
 });
 
 // ── Blog: PUT (Update Article) ────────────────────────────────────────────────
-app.put('/api/blog/:id', requireAuth, async (req, res) => {
+app.put('/api/blog/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
   const { title, slug, cover_image, excerpt, content, author, category, read_time_min } = req.body;
 
@@ -878,7 +903,7 @@ app.put('/api/blog/:id', requireAuth, async (req, res) => {
 });
 
 // ── Blog: DELETE Article ──────────────────────────────────────────────────────
-app.delete('/api/blog/:id', requireAuth, async (req, res) => {
+app.delete('/api/blog/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
   const currentBlogs = getStoredBlogs();
   const filtered = currentBlogs.filter(b => b.id !== id && b.slug !== id);
@@ -1280,8 +1305,8 @@ app.post('/api/quotes', formLimiter, async (req, res) => {
 
 // Dead code removed — duplicate /api/newsletter route deleted (security cleanup)
 
-// MEDIUM FIX: requireAuth prevents public PII exposure of all customer orders
-app.get('/api/orders', requireAuth, (req, res) => {
+// Admin-only: every customer's order (name, address, phone) is in this list
+app.get('/api/orders', requireAdmin, (req, res) => {
   return res.json(localOrders);
 });
 
@@ -1292,11 +1317,50 @@ function calculateShipping(subtotal) {
   return subtotal > 100 || subtotal === 0 ? 0 : 15.0;
 }
 
+const MAX_ITEM_QUANTITY = 10000;
+
+/**
+ * Rebuilds the cart from the catalogue: name and unit price come from the
+ * product record, never from the request, so an edited cart (price: 0.01)
+ * cannot change what the order and both emails say is owed.
+ * Returns { items } or { error } when a line is unknown or malformed.
+ */
+async function priceOrderItems(rawItems) {
+  let catalogue = mockData.products;
+  if (supabase) {
+    const { data, error } = await supabase.from('products').select('id, slug, name, price');
+    if (!error && data && data.length > 0) catalogue = data;
+  }
+
+  const items = [];
+  for (const raw of rawItems) {
+    if (!raw || typeof raw !== 'object') return { error: 'Invalid item in cart.' };
+    const product = catalogue.find((p) =>
+      (raw.id != null && String(p.id) === String(raw.id)) ||
+      (raw.slug && p.slug === raw.slug));
+    if (!product) return { error: `"${sanitizeText(String(raw.name || 'An item'), 100)}" is no longer available. Please remove it from your basket.` };
+
+    const quantity = Number(raw.quantity);
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_ITEM_QUANTITY) {
+      return { error: 'Each item quantity must be a whole number between 1 and 10000.' };
+    }
+
+    items.push({
+      id: product.id,
+      slug: product.slug,
+      name: product.name,
+      price: Number(product.price) || 0,
+      quantity,
+    });
+  }
+  return { items };
+}
+
 // requireAuth verifies the Supabase access token and attaches req.user.
 app.post('/api/orders', requireAuth, async (req, res) => {
   // MEDIUM FIX: Remove attacker-controlled targetEmail from req.body
-  const { customer, items, paymentMethod } = req.body;
-  if (!customer || !items || !Array.isArray(items) || items.length === 0) {
+  const { customer, items: rawItems, paymentMethod } = req.body;
+  if (!customer || typeof customer !== 'object' || !Array.isArray(rawItems) || rawItems.length === 0 || rawItems.length > 100) {
     return res.status(400).json({ success: false, message: 'Invalid order data: customer details and items are required.' });
   }
 
@@ -1325,7 +1389,19 @@ app.post('/api/orders', requireAuth, async (req, res) => {
   // This is the FIXED recipient of the "Order Confirmed" internal alert.
   const destinationEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
 
-  const subtotal = items.reduce((sum, item) => sum + (Number(item.price) || 0) * (Number(item.quantity) || 0), 0);
+  let priced;
+  try {
+    priced = await priceOrderItems(rawItems);
+  } catch (err) {
+    console.error(`❌ [Orders] Could not price order for user ${req.user.id}:`, err.message);
+    return res.status(503).json({ success: false, message: 'We could not verify product prices right now. Please try again.' });
+  }
+  if (priced.error) {
+    return res.status(400).json({ success: false, message: priced.error });
+  }
+  const items = priced.items;
+
+  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const shippingCost = calculateShipping(subtotal);
 
   // MEDIUM FIX: Bounded array — cap in-memory store to prevent DoS
@@ -1400,11 +1476,16 @@ app.post('/api/orders', requireAuth, async (req, res) => {
 // checkout treats as "API down" and silently falls back to admin-only email.
 app.use((err, req, res, next) => {
   if (err && err.isCorsRejection) {
-    console.warn(`⛔ ${err.message} (allowed: ${allowedOrigins.join(', ') || 'any'})`);
+    console.warn(`⛔ ${err.message} (allowed: ${allowedOrigins.join(', ') || 'same-origin only — set FRONTEND_URL'})`);
     return res.status(403).json({ success: false, message: 'Requests from this origin are not allowed.' });
   }
   return next(err);
 });
+
+// Unknown API routes get a JSON 404; everything else that throws gets a
+// generic message plus a correlation ID — never a stack trace or file path.
+app.use('/api', notFoundHandler);
+app.use(globalExceptionHandler);
 
 // ── Start Server ──────────────────────────────────────────────────────────────
 // Start Server locally

@@ -2,7 +2,16 @@ const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+const supabaseKey = serviceKey || process.env.SUPABASE_ANON_KEY;
+
+// RLS only allows the browser to READ the catalogue (fix_supabase_security.sql).
+// Admin writes and image uploads therefore need the service-role key; on the
+// anon key they are rejected by RLS.
+if (supabaseUrl && !serviceKey && process.env.SUPABASE_ANON_KEY) {
+  console.error('❌ SUPABASE_SERVICE_ROLE_KEY is not set — backend is using the anon key. ' +
+    'Product/image writes will be rejected by Row Level Security.');
+}
 
 let supabase = null;
 

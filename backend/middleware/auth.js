@@ -2,7 +2,8 @@ const supabase = require('../supabaseClient');
 
 /**
  * Express middleware to verify Supabase JWT token from Authorization header.
- * Use this to protect sensitive routes (e.g., POST/PUT/DELETE /api/products).
+ * Proves WHO the caller is — any signed-in customer passes. For admin-only
+ * routes use requireAdmin, which also checks WHAT they are allowed to do.
  */
 const requireAuth = async (req, res, next) => {
   try {
@@ -12,11 +13,11 @@ const requireAuth = async (req, res, next) => {
     }
 
     const token = authHeader.split(' ')[1];
-    
+
     // If Supabase client is initialized, verify the token with it
     if (supabase) {
       const { data: { user }, error } = await supabase.auth.getUser(token);
-      
+
       if (error || !user) {
         return res.status(401).json({ success: false, message: 'Invalid or expired authentication token.' });
       }
@@ -36,6 +37,57 @@ const requireAuth = async (req, res, next) => {
   }
 };
 
+// Admin allowlist, read per call so it honours env loaded after import (and
+// so a Vercel env-var change takes effect on next request, no redeploy of
+// this file needed). ADMIN_EMAILS is a comma-separated list, e.g.
+// "owner@yourcompany.com,ops@yourcompany.com" — set in Vercel, never in source.
+// No default: an unset ADMIN_EMAILS means nobody matches by email (fail
+// closed), not "fall back to some address baked into the code".
+function getAdminEmails() {
+  return (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/**
+ * A user is an admin when either:
+ *  - app_metadata.role === 'admin' (only settable with the service-role key,
+ *    so a customer can never grant it to themselves), or
+ *  - their CONFIRMED email is on the ADMIN_EMAILS allowlist. Unconfirmed
+ *    addresses never count — anyone can sign up with an address they don't own.
+ */
+function isAdminUser(user) {
+  if (!user) return false;
+  if (user.app_metadata && user.app_metadata.role === 'admin') return true;
+  const email = String(user.email || '').trim().toLowerCase();
+  return Boolean(email && user.email_confirmed_at && getAdminEmails().includes(email));
+}
+
+/**
+ * requireAuth + role check. Use on every route that changes the catalogue,
+ * reads other customers' data, or can send email to arbitrary addresses.
+ *
+ * Both outcomes are logged (audit trail): who tried, what they hit, and
+ * whether it was allowed. A stream of denials for the same account is a
+ * signal worth watching in production logs.
+ */
+const requireAdmin = (req, res, next) => {
+  requireAuth(req, res, () => {
+    if (!isAdminUser(req.user)) {
+      if (getAdminEmails().length === 0) {
+        console.warn('⚠️  ADMIN_EMAILS is not set — no email can pass requireAdmin (app_metadata.role still works). Set it in Vercel.');
+      }
+      console.warn(`⛔ [admin-audit] DENIED ${req.method} ${req.path} — user ${req.user.id} (${req.user.email})`);
+      return res.status(403).json({ success: false, message: 'Admin access required.' });
+    }
+    console.log(`✅ [admin-audit] ${req.method} ${req.path} — ${req.user.email}`);
+    return next();
+  });
+};
+
 module.exports = {
-  requireAuth
+  requireAuth,
+  requireAdmin,
+  isAdminUser
 };
