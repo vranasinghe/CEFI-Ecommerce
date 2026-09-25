@@ -6,7 +6,9 @@
     "dev": "node start-dev.js",
     "server": "cd backend && npm start",
     "client": "cd frontend && npm run dev",
-    "build": "cd frontend && npm run build"
+    "build": "cd frontend && npm run build",
+    "prepare": "git config core.hooksPath .githooks",
+    "check-secrets": "node scripts/check-secrets.js --staged"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

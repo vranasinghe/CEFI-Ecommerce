@@ -1,0 +1,4 @@
+#!/bin/sh
+# Blocks the commit if the staged changes add a password, API key or .env file.
+# Enabled by `npm install` at the repo root (sets core.hooksPath=.githooks).
+exec node "$(git rev-parse --show-toplevel)/scripts/check-secrets.js" --staged
