@@ -214,10 +214,13 @@ export default function AdminDashboard() {
       const url = isNew ? '/api/blog' : `/api/blog/${blogForm.id}`;
       const method = isNew ? 'POST' : 'PUT';
 
+      // Send only the article fields: the API rejects unknown fields (the id
+      // travels in the URL).
+      const { title, slug, category, author, read_time_min, cover_image, excerpt, content } = blogForm;
       const res = await authFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(blogForm)
+        body: JSON.stringify({ title, slug, category, author, read_time_min, cover_image, excerpt, content })
       });
       const data = await res.json();
 

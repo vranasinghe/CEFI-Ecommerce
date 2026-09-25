@@ -1,4 +1,5 @@
 const supabase = require('../supabaseClient');
+const { recordAdminAction } = require('../lib/audit-log');
 
 /**
  * Express middleware to verify Supabase JWT token from Authorization header.
@@ -78,10 +79,10 @@ const requireAdmin = (req, res, next) => {
       if (getAdminEmails().length === 0) {
         console.warn('⚠️  ADMIN_EMAILS is not set — no email can pass requireAdmin (app_metadata.role still works). Set it in Vercel.');
       }
-      console.warn(`⛔ [admin-audit] DENIED ${req.method} ${req.path} — user ${req.user.id} (${req.user.email})`);
+      recordAdminAction(req, 'denied');
       return res.status(403).json({ success: false, message: 'Admin access required.' });
     }
-    console.log(`✅ [admin-audit] ${req.method} ${req.path} — ${req.user.email}`);
+    recordAdminAction(req, 'allowed');
     return next();
   });
 };

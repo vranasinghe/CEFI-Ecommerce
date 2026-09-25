@@ -56,3 +56,22 @@ jobs:
       - name: Scan pushed commits
         if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
         run: node scripts/check-secrets.js --range "${{ github.event.before }}..${{ github.sha }}"
+
+  # Fails the PR / push if a shipped dependency has a known vulnerability of
+  # moderate severity or worse (Master-Vault item 66).
+  dependency-audit:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [frontend, backend]
+    defaults:
+      run:
+        working-directory: ./${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+      - name: npm audit (production dependencies)
+        run: npm audit --omit=dev --audit-level=moderate

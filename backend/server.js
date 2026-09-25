@@ -5,13 +5,20 @@ const fs = require('fs');
 const nodemailer = require('nodemailer');
 const { Resend } = require('resend');
 const helmet = require('helmet');
-const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
 const { requireAuth, requireAdmin, isAdminUser } = require('./middleware/auth');
 const { sanitizeText, sanitizeHtml, sanitizeHeader, isValidEmail, isValidString } = require('./lib/sanitize');
 require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
 const { sendOrderEmails } = require('./lib/order-email-service');
-const { globalExceptionHandler, notFoundHandler } = require('./lib/error-handler');
+const { globalExceptionHandler, notFoundHandler, setupProcessErrorHandlers } = require('./lib/error-handler');
+const { globalLimiter, formLimiter, userApiLimiter, orderLimiter, uploadLimiter } = require('./lib/rate-limit');
+const schemas = require('./lib/schemas');
+const { validateBody } = schemas;
+const { saveOrder, listOrders } = require('./lib/orders-repo');
+
+// ── Process-level guards (unhandledRejection / uncaughtException) ────────────
+// Must run before any async code so nothing slips through.
+setupProcessErrorHandlers();
 
 // ── CRITICAL SECURITY: No hardcoded credentials. Fail loudly if env vars missing.
 const EMAIL_USER = process.env.EMAIL_USER;
@@ -156,6 +163,12 @@ try {
 }
 
 const supabase = require('./supabaseClient');
+
+// Field-level selects: queries name their columns, so a column added to a
+// table later (e.g. internal notes) is never exposed by an existing endpoint.
+const PRODUCT_COLUMNS = 'id, name, slug, short_description, full_description, price, category_slug, category_name, origin, weight, weight_g, stock_quantity, is_wholesale_only, is_featured, images, variants, created_at, updated_at';
+const CATEGORY_COLUMNS = 'id, name, slug, description, image_url';
+const BLOG_COLUMNS = 'id, title, slug, category, cover_image, excerpt, content, author, read_time_min, published_at, updated_at';
 const mockData = require('./mockData');
 
 const app = express();
@@ -174,32 +187,9 @@ try {
 app.use(helmet());
 app.use(helmet.crossOriginResourcePolicy({ policy: "cross-origin" }));
 
-// Vercel sets x-real-ip to the client IP; locally req.ip is already the client.
-// Both limiters must key on the real client, or every visitor shares one bucket
-// behind the proxy and one abuser can lock the whole site out.
-const clientIpKey = (req) => ipKeyGenerator(req.headers['x-real-ip'] || req.ip || '');
-
-// Rate Limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: clientIpKey,
-});
-app.use(limiter);
-
-// Public forms email whatever address is typed in, from our verified domain.
-// A tight per-IP cap stops them being used to spam third parties (which would
-// also burn the domain's sending reputation).
-const formLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: clientIpKey,
-  message: { success: false, message: 'Too many submissions. Please wait a few minutes and try again.' }
-});
+// Rate limiting (lib/rate-limit.js): per-IP for anonymous traffic, per-user
+// once signed in; shared across serverless instances when Upstash is set.
+app.use(globalLimiter);
 
 // HIGH FIX: Tight CORS — only allow known frontend origins
 // Origins are normalised before comparison: an env value with a stray space,
@@ -260,12 +250,12 @@ app.use(cors((req, callback) => {
     credentials: true,
   });
 }));
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '1mb' }));  // Vault Module 4: 1MB hard cap
 app.use(cookieParser());
 app.use('/uploads', express.static(uploadsDir));
 
 // ── Debug: deployment config (admin-only — reveals env layout and origins) ──
-app.get('/api/debug', requireAdmin, (req, res) => {
+app.get('/api/debug', requireAdmin, userApiLimiter, (req, res) => {
   res.json({
     status: 'ok',
     supabaseConnected: !!supabase,
@@ -285,24 +275,14 @@ app.get('/api/debug', requireAdmin, (req, res) => {
 let upload = null;
 if (multer) {
   const storage = multer.memoryStorage();
-  upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
+  // 4 MB per file: Vercel rejects request bodies over 4.5 MB before they reach
+  // the function, so a higher limit here would only produce an opaque 413.
+  upload = multer({ storage, limits: { fileSize: 4 * 1024 * 1024, files: 10 } });
 }
-
-// ── In-memory fallback stores ────────────────────────────────────────────────
-const MAX_LOCAL_STORE = 500;
-function pushBounded(arr, item) {
-  arr.unshift(item);
-  if (arr.length > MAX_LOCAL_STORE) arr.pop();
-}
-
-const localContactMessages = [];
-const localSubscribers = [];
-const localQuotes = [];
-const localOrders = [];
 
 // ── Email Diagnostic Test Endpoint ───────────────────────────────────────────
 // Admin-only: sends to any ?to= address, so a customer login must not reach it
-app.get('/api/test-email', requireAdmin, async (req, res) => {
+app.get('/api/test-email', requireAdmin, userApiLimiter, async (req, res) => {
   const targetEmail = req.query.to || process.env.ADMIN_EMAIL || process.env.EMAIL_USER || 'ceylonecofreshinfinity@gmail.com';
   console.log(`🧪 Diagnostic Test Email requested for: ${targetEmail}`);
 
@@ -337,7 +317,7 @@ app.get('/api/test-email', requireAdmin, async (req, res) => {
 // app_metadata.role on the backend (see middleware/auth.js). The frontend
 // never hardcodes an admin email — it asks here instead, every time it needs
 // to know, so a tampered localStorage value can never grant admin UI access.
-app.get('/api/auth/me', requireAuth, (req, res) => {
+app.get('/api/auth/me', requireAuth, userApiLimiter, (req, res) => {
   res.json({
     success: true,
     user: {
@@ -375,7 +355,7 @@ app.get('/api/categories', async (req, res) => {
 
   try {
     if (supabase) {
-      const { data, error } = await supabase.from('categories').select('*');
+      const { data, error } = await supabase.from('categories').select(CATEGORY_COLUMNS);
       if (!error && data && data.length > 0) return res.json(sortData(data));
     }
     return res.json(sortData([...mockData.categories]));
@@ -388,7 +368,7 @@ app.get('/api/categories/:slug', async (req, res) => {
   const { slug } = req.params;
   try {
     if (supabase) {
-      const { data, error } = await supabase.from('categories').select('*').eq('slug', slug).single();
+      const { data, error } = await supabase.from('categories').select(CATEGORY_COLUMNS).eq('slug', slug).single();
       if (!error && data) return res.json(data);
     }
     const cat = mockData.categories.find(c => c.slug === slug);
@@ -466,7 +446,7 @@ app.get('/api/catalog-profile', (req, res) => {
   return res.json(currentCatalogProfile || defaultCatalogProfile);
 });
 
-app.post('/api/catalog-profile', requireAdmin, (req, res) => {
+app.post('/api/catalog-profile', requireAdmin, userApiLimiter, validateBody(schemas.catalogProfileSchema), (req, res) => {
   try {
     const updated = req.body;
     if (!updated || typeof updated !== 'object') {
@@ -480,7 +460,7 @@ app.post('/api/catalog-profile', requireAdmin, (req, res) => {
   }
 });
 
-app.put('/api/catalog-profile', requireAdmin, (req, res) => {
+app.put('/api/catalog-profile', requireAdmin, userApiLimiter, validateBody(schemas.catalogProfileSchema), (req, res) => {
   try {
     const updated = req.body;
     if (!updated || typeof updated !== 'object') {
@@ -501,7 +481,7 @@ app.get('/api/products', async (req, res) => {
     let list = [...mockData.products];
     let source = 'mockData';
     if (supabase) {
-      const { data, error } = await supabase.from('products').select('*');
+      const { data, error } = await supabase.from('products').select(PRODUCT_COLUMNS);
       if (error) {
         console.error('❌ Supabase products fetch error:', error.message);
       } else if (data && data.length > 0) {
@@ -534,7 +514,7 @@ app.get('/api/products/:slug', async (req, res) => {
   const { slug } = req.params;
   try {
     if (supabase) {
-      const { data, error } = await supabase.from('products').select('*').eq('slug', slug).single();
+      const { data, error } = await supabase.from('products').select(PRODUCT_COLUMNS).eq('slug', slug).single();
       if (!error && data) return res.json(data);
     }
     const prod = mockData.products.find(p => p.slug === slug);
@@ -549,7 +529,7 @@ app.get('/api/products/:slug', async (req, res) => {
 
 // ── Products: POST (Add new) ──────────────────────────────────────────────────
 // CRITICAL FIX: All product write endpoints now require authentication
-app.post('/api/products', requireAdmin, async (req, res) => {
+app.post('/api/products', requireAdmin, userApiLimiter, validateBody(schemas.productCreateSchema), async (req, res) => {
   const { name, slug, price, short_description, full_description, images, category_slug, is_wholesale_only, is_featured, variants } = req.body;
   if (!name || !slug || !category_slug) {
     return res.status(400).json({ success: false, message: 'Missing required fields.' });
@@ -572,7 +552,7 @@ app.post('/api/products', requireAdmin, async (req, res) => {
   };
   try {
     if (supabase) {
-      const { data, error } = await supabase.from('products').insert([payload]).select();
+      const { data, error } = await supabase.from('products').insert([payload]).select(PRODUCT_COLUMNS);
       if (error) {
         console.error('Supabase insert error:', error.message);
         return res.status(500).json({ success: false, message: 'Could not save the product. Please try again.' });
@@ -589,7 +569,7 @@ app.post('/api/products', requireAdmin, async (req, res) => {
   return res.json({ success: true, message: 'Product added!', product: payload });
 });
 
-app.put('/api/products/:id', requireAdmin, async (req, res) => {
+app.put('/api/products/:id', requireAdmin, userApiLimiter, validateBody(schemas.productUpdateSchema), async (req, res) => {
   const { id } = req.params;
   const updates = { ...req.body };
   delete updates.id; // don't update ID
@@ -623,7 +603,7 @@ app.put('/api/products/:id', requireAdmin, async (req, res) => {
         query = query.eq('slug', id);
       }
       
-      const { data, error } = await query.select();
+      const { data, error } = await query.select(PRODUCT_COLUMNS);
       if (error) {
         console.error('Supabase update error:', error.message);
         return res.status(500).json({ success: false, message: 'Could not update the product. Please try again.' });
@@ -657,7 +637,7 @@ app.put('/api/products/:id', requireAdmin, async (req, res) => {
 });
 
 // ── Products: DELETE ──────────────────────────────────────────────────────────
-app.delete('/api/products/:id', requireAdmin, async (req, res) => {
+app.delete('/api/products/:id', requireAdmin, userApiLimiter, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -697,7 +677,7 @@ try {
 }
 
 // Admin-only: prevents storage quota exhaustion and catalogue image tampering
-app.post('/api/upload', requireAdmin, (req, res) => {
+app.post('/api/upload', requireAdmin, uploadLimiter, (req, res) => {
   if (!upload) {
     return res.status(500).json({ success: false, message: 'Image upload not available. Run: npm install multer in the backend folder.' });
   }
@@ -763,162 +743,192 @@ app.post('/api/upload', requireAdmin, (req, res) => {
   });
 });
 
+// ── Blog storage ─────────────────────────────────────────────────────────────
+// The blog_posts table is the single source of truth once the migration has
+// run (it seeds the posts from blogs.json). Every write goes to exactly one
+// store, so a post can't end up half-saved in two places. Until the table
+// exists, blogs.json is used — that works locally, and on Vercel's read-only
+// filesystem a write fails loudly (503) instead of pretending to succeed.
 const blogsFilePath = path.join(__dirname, 'blogs.json');
+let blogTableMissing = !supabase;
 
-function getStoredBlogs() {
+function isMissingTable(error) {
+  return Boolean(error && /blog_posts|schema cache|does not exist/i.test(error.message));
+}
+
+function readBlogFile() {
   try {
-    if (fs.existsSync(blogsFilePath)) {
-      return JSON.parse(fs.readFileSync(blogsFilePath, 'utf8'));
-    }
+    if (fs.existsSync(blogsFilePath)) return JSON.parse(fs.readFileSync(blogsFilePath, 'utf8'));
   } catch (e) {
-    console.error('Error reading blogs.json:', e);
+    console.error('Error reading blogs.json:', e.message);
   }
   return mockData.blogPosts || [];
 }
 
-function saveStoredBlogs(blogs) {
-  try {
-    fs.writeFileSync(blogsFilePath, JSON.stringify(blogs, null, 2), 'utf8');
-  } catch (e) {
-    console.error('Error writing blogs.json:', e);
-  }
+function writeBlogFile(blogs) {
+  fs.writeFileSync(blogsFilePath, JSON.stringify(blogs, null, 2), 'utf8');
 }
+
+const blogStore = {
+  async list() {
+    if (!blogTableMissing) {
+      const { data, error } = await supabase.from('blog_posts').select(BLOG_COLUMNS).order('published_at', { ascending: false });
+      if (!error) return data;
+      if (!isMissingTable(error)) throw error;
+      blogTableMissing = true;
+    }
+    return readBlogFile();
+  },
+
+  async find(idOrSlug) {
+    // The value is interpolated into a PostgREST filter below; only plain
+    // id/slug characters are allowed so it can't inject extra conditions.
+    if (!/^[\w-]{1,200}$/.test(String(idOrSlug))) return null;
+    if (!blogTableMissing) {
+      const { data, error } = await supabase.from('blog_posts').select(BLOG_COLUMNS)
+        .or(`id.eq.${idOrSlug},slug.eq.${idOrSlug}`).limit(1);
+      if (!error) return data[0] || null;
+      if (!isMissingTable(error)) throw error;
+      blogTableMissing = true;
+    }
+    return readBlogFile().find((b) => b.id === idOrSlug || b.slug === idOrSlug) || null;
+  },
+
+  async create(post) {
+    if (!blogTableMissing) {
+      const { data, error } = await supabase.from('blog_posts').insert(post).select(BLOG_COLUMNS).single();
+      if (!error) return data;
+      if (!isMissingTable(error)) throw error;
+      blogTableMissing = true;
+    }
+    const blogs = readBlogFile();
+    blogs.unshift(post);
+    writeBlogFile(blogs);
+    return post;
+  },
+
+  async update(id, changes) {
+    if (!blogTableMissing) {
+      const { data, error } = await supabase.from('blog_posts').update(changes).eq('id', id).select(BLOG_COLUMNS).single();
+      if (!error) return data;
+      if (!isMissingTable(error)) throw error;
+      blogTableMissing = true;
+    }
+    const blogs = readBlogFile();
+    const i = blogs.findIndex((b) => b.id === id);
+    if (i === -1) return null;
+    blogs[i] = { ...blogs[i], ...changes };
+    writeBlogFile(blogs);
+    return blogs[i];
+  },
+
+  async remove(id) {
+    if (!blogTableMissing) {
+      const { error } = await supabase.from('blog_posts').delete().eq('id', id);
+      if (!error) return;
+      if (!isMissingTable(error)) throw error;
+      blogTableMissing = true;
+    }
+    writeBlogFile(readBlogFile().filter((b) => b.id !== id));
+  },
+};
+
+const toSlug = (value) => String(value).toLowerCase().trim()
+  .replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+
+const blogStorageError = (res, action, err) => {
+  console.error(`❌ [Blog] ${action} failed:`, err.message);
+  return res.status(503).json({ success: false, message: `Could not ${action} the article right now. Please try again.` });
+};
 
 // ── Blog: GET all ─────────────────────────────────────────────────────────────
 app.get('/api/blog', async (req, res) => {
   try {
-    if (supabase) {
-      const { data, error } = await supabase.from('blog_posts').select('*').order('published_at', { ascending: false });
-      if (!error && data && data.length > 0) return res.json(data);
-    }
-    return res.json(getStoredBlogs());
-  } catch {
-    return res.json(getStoredBlogs());
+    return res.json(await blogStore.list());
+  } catch (err) {
+    console.error('❌ [Blog] list failed:', err.message);
+    return res.json(readBlogFile());
   }
 });
 
 // ── Blog: GET one by slug or id ───────────────────────────────────────────────
 app.get('/api/blog/:slug', async (req, res) => {
-  const { slug } = req.params;
+  const key = String(req.params.slug).slice(0, 200);
+  if (!/^[\w-]+$/.test(key)) return res.status(404).json({ message: 'Post not found' });
   try {
-    if (supabase) {
-      const { data, error } = await supabase.from('blog_posts').select('*').eq('slug', slug).single();
-      if (!error && data) return res.json(data);
-    }
-    const blogs = getStoredBlogs();
-    const post = blogs.find(b => b.slug === slug || b.id === slug);
-    if (post) return res.json(post);
-    return res.status(404).json({ message: 'Post not found' });
-  } catch {
-    const blogs = getStoredBlogs();
-    const post = blogs.find(b => b.slug === slug || b.id === slug);
-    if (post) return res.json(post);
+    const post = await blogStore.find(key);
+    return post ? res.json(post) : res.status(404).json({ message: 'Post not found' });
+  } catch (err) {
+    console.error('❌ [Blog] read failed:', err.message);
     return res.status(404).json({ message: 'Post not found' });
   }
 });
 
 // ── Blog: POST (Create New Article) ──────────────────────────────────────────
-// CRITICAL FIX: All blog write endpoints now require authentication
-app.post('/api/blog', requireAdmin, async (req, res) => {
+app.post('/api/blog', requireAdmin, userApiLimiter, validateBody(schemas.blogCreateSchema), async (req, res) => {
   const { title, slug, cover_image, excerpt, content, author, category, read_time_min } = req.body;
-  if (!title || !content) {
-    return res.status(400).json({ success: false, message: 'Title and content are required.' });
-  }
 
-  const generatedSlug = (slug || title)
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
-
-  // HIGH FIX: Sanitize all user-supplied strings to prevent Stored XSS
+  // Stored XSS guard: strip/sanitise every user-supplied string.
   const newPost = {
     id: `blog-${Date.now()}`,
-    title:          sanitizeText(title, 300),
-    slug:           generatedSlug,
-    category:       sanitizeText(category || 'Trade & Insights', 100),
-    cover_image:    sanitizeText(cover_image || 'https://images.unsplash.com/photo-1597481499750-3e6b22637e12?auto=format&fit=crop&w=800&q=80', 500),
-    excerpt:        sanitizeText(excerpt || content.substring(0, 160), 500),
-    content:        sanitizeHtml(content),
-    author:         sanitizeText(author || 'CEFI Editorial Team', 100),
-    read_time_min:  parseInt(read_time_min, 10) || 5,
-    published_at:   new Date().toISOString()
+    title:         sanitizeText(title, 300),
+    slug:          toSlug(slug || title),
+    category:      sanitizeText(category || 'Trade & Insights', 100),
+    cover_image:   sanitizeText(cover_image || 'https://images.unsplash.com/photo-1597481499750-3e6b22637e12?auto=format&fit=crop&w=800&q=80', 1000),
+    excerpt:       sanitizeText(excerpt || content.substring(0, 160), 500),
+    content:       sanitizeHtml(content),
+    author:        sanitizeText(author || 'CEFI Editorial Team', 100),
+    read_time_min: read_time_min || 5,
+    published_at:  new Date().toISOString()
   };
 
   try {
-    if (supabase) {
-      await supabase.from('blog_posts').insert([newPost]);
-    }
-  } catch (e) {
-    console.warn('Supabase blog insert fallback:', e.message);
+    const post = await blogStore.create(newPost);
+    console.log(`📝 New Blog Post Created: "${post.title}"`);
+    return res.json({ success: true, message: 'Blog article published successfully!', post });
+  } catch (err) {
+    return blogStorageError(res, 'publish', err);
   }
-
-  const currentBlogs = getStoredBlogs();
-  currentBlogs.unshift(newPost);
-  saveStoredBlogs(currentBlogs);
-
-  console.log(`📝 New Blog Post Created: "${newPost.title}"`);
-  return res.json({ success: true, message: 'Blog article published successfully!', post: newPost });
 });
 
 // ── Blog: PUT (Update Article) ────────────────────────────────────────────────
-app.put('/api/blog/:id', requireAdmin, async (req, res) => {
-  const { id } = req.params;
+app.put('/api/blog/:id', requireAdmin, userApiLimiter, validateBody(schemas.blogUpdateSchema), async (req, res) => {
   const { title, slug, cover_image, excerpt, content, author, category, read_time_min } = req.body;
 
-  const currentBlogs = getStoredBlogs();
-  const index = currentBlogs.findIndex(b => b.id === id || b.slug === id);
-  if (index === -1) {
-    return res.status(404).json({ success: false, message: 'Article not found.' });
-  }
-
-  // XSS FIX: Sanitize all fields before storage
-  const updatedPost = {
-    ...currentBlogs[index],
-    title:        title        !== undefined ? sanitizeText(title, 300)        : currentBlogs[index].title,
-    slug:         slug         !== undefined ? slug                            : currentBlogs[index].slug,
-    category:     category     !== undefined ? sanitizeText(category, 100)    : currentBlogs[index].category,
-    cover_image:  cover_image  !== undefined ? sanitizeText(cover_image, 500) : currentBlogs[index].cover_image,
-    excerpt:      excerpt      !== undefined ? sanitizeText(excerpt, 500)      : currentBlogs[index].excerpt,
-    content:      content      !== undefined ? sanitizeHtml(content)           : currentBlogs[index].content,
-    author:       author       !== undefined ? sanitizeText(author, 100)       : currentBlogs[index].author,
-    read_time_min: read_time_min !== undefined ? (parseInt(read_time_min, 10) || 5) : currentBlogs[index].read_time_min,
-    updated_at:   new Date().toISOString()
-  };
-
   try {
-    if (supabase) {
-      await supabase.from('blog_posts').update(updatedPost).eq('id', id);
-    }
-  } catch (e) {
-    console.warn('Supabase blog update fallback:', e.message);
+    const existing = await blogStore.find(String(req.params.id).slice(0, 200));
+    if (!existing) return res.status(404).json({ success: false, message: 'Article not found.' });
+
+    // Only fields that were sent change; each is sanitised.
+    const changes = { updated_at: new Date().toISOString() };
+    if (title !== undefined)         changes.title = sanitizeText(title, 300);
+    if (slug !== undefined)          changes.slug = toSlug(slug);
+    if (category !== undefined)      changes.category = sanitizeText(category, 100);
+    if (cover_image !== undefined)   changes.cover_image = sanitizeText(cover_image, 1000);
+    if (excerpt !== undefined)       changes.excerpt = sanitizeText(excerpt, 500);
+    if (content !== undefined)       changes.content = sanitizeHtml(content);
+    if (author !== undefined)        changes.author = sanitizeText(author, 100);
+    if (read_time_min !== undefined) changes.read_time_min = read_time_min;
+
+    const post = await blogStore.update(existing.id, changes);
+    console.log(`📝 Blog Post Updated: "${post.title}"`);
+    return res.json({ success: true, message: 'Blog article updated successfully!', post });
+  } catch (err) {
+    return blogStorageError(res, 'update', err);
   }
-
-  currentBlogs[index] = updatedPost;
-  saveStoredBlogs(currentBlogs);
-
-  console.log(`📝 Blog Post Updated: "${updatedPost.title}"`);
-  return res.json({ success: true, message: 'Blog article updated successfully!', post: updatedPost });
 });
 
 // ── Blog: DELETE Article ──────────────────────────────────────────────────────
-app.delete('/api/blog/:id', requireAdmin, async (req, res) => {
-  const { id } = req.params;
-  const currentBlogs = getStoredBlogs();
-  const filtered = currentBlogs.filter(b => b.id !== id && b.slug !== id);
-
+app.delete('/api/blog/:id', requireAdmin, userApiLimiter, async (req, res) => {
   try {
-    if (supabase) {
-      await supabase.from('blog_posts').delete().eq('id', id);
-    }
-  } catch (e) {
-    console.warn('Supabase blog delete fallback:', e.message);
+    const existing = await blogStore.find(String(req.params.id).slice(0, 200));
+    if (!existing) return res.status(404).json({ success: false, message: 'Article not found.' });
+    await blogStore.remove(existing.id);
+    console.log(`🗑️ Blog Post Deleted: ${existing.id}`);
+    return res.json({ success: true, message: 'Blog article deleted successfully!' });
+  } catch (err) {
+    return blogStorageError(res, 'delete', err);
   }
-
-  saveStoredBlogs(filtered);
-  console.log(`🗑️ Blog Post Deleted: ${id}`);
-  return res.json({ success: true, message: 'Blog article deleted successfully!' });
 });
 
 // ── Contact / Quotes / Orders ─────────────────────────────────────────────────
@@ -1018,7 +1028,7 @@ ${message}
 }
 
 // ── Contact Route (POST /api/contact) ─────────────────────────────────────────
-app.post('/api/contact', formLimiter, async (req, res) => {
+app.post('/api/contact', formLimiter, validateBody(schemas.contactSchema), async (req, res) => {
   const { name, email, phone, subject, message } = req.body;
 
   // MEDIUM FIX: Strict input validation with email format check and length caps
@@ -1132,7 +1142,7 @@ async function sendNewsletterEmail(email) {
   return { success: delivered, method: 'formsubmit', adminSent: delivered, customerSent };
 }
 
-app.post('/api/newsletter', formLimiter, async (req, res) => {
+app.post('/api/newsletter', formLimiter, validateBody(schemas.newsletterSchema), async (req, res) => {
   const { email } = req.body;
 
   // MEDIUM FIX: Email format validation
@@ -1262,7 +1272,7 @@ ${notes}
 }
 
 // ── Quote Route (POST /api/quotes) ───────────────────────────────────────────
-app.post('/api/quotes', formLimiter, async (req, res) => {
+app.post('/api/quotes', formLimiter, validateBody(schemas.quoteSchema), async (req, res) => {
   const { name, company, email, phone, product, quantity, targetDestination, destinationPort, notes, message } = req.body;
 
   // MEDIUM FIX: Strict validation on all quote fields
@@ -1306,8 +1316,13 @@ app.post('/api/quotes', formLimiter, async (req, res) => {
 // Dead code removed — duplicate /api/newsletter route deleted (security cleanup)
 
 // Admin-only: every customer's order (name, address, phone) is in this list
-app.get('/api/orders', requireAdmin, (req, res) => {
-  return res.json(localOrders);
+app.get('/api/orders', requireAdmin, userApiLimiter, async (req, res) => {
+  try {
+    return res.json(await listOrders());
+  } catch (err) {
+    console.error('❌ [Orders] list failed:', err.message);
+    return res.status(500).json({ success: false, message: 'Could not load orders. Please try again.' });
+  }
 });
 
 // ── Shipping rule ─────────────────────────────────────────────────────────────
@@ -1357,12 +1372,9 @@ async function priceOrderItems(rawItems) {
 }
 
 // requireAuth verifies the Supabase access token and attaches req.user.
-app.post('/api/orders', requireAuth, async (req, res) => {
-  // MEDIUM FIX: Remove attacker-controlled targetEmail from req.body
+app.post('/api/orders', requireAuth, orderLimiter, validateBody(schemas.orderSchema), async (req, res) => {
+  // Shape, sizes and allowed fields already enforced by schemas.orderSchema.
   const { customer, items: rawItems, paymentMethod } = req.body;
-  if (!customer || typeof customer !== 'object' || !Array.isArray(rawItems) || rawItems.length === 0 || rawItems.length > 100) {
-    return res.status(400).json({ success: false, message: 'Invalid order data: customer details and items are required.' });
-  }
 
   // The confirmation recipient is the buyer's REGISTERED account email, read
   // from the verified session token — never from the request body. A client
@@ -1404,21 +1416,37 @@ app.post('/api/orders', requireAuth, async (req, res) => {
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const shippingCost = calculateShipping(subtotal);
 
-  // MEDIUM FIX: Bounded array — cap in-memory store to prevent DoS
+  // Customer fields are listed explicitly (no spread) and sanitised: only
+  // these reach storage and the emails.
   const orderRecord = {
     orderId,
     userId: req.user.id,
-    customer: { ...customer, email: customerEmail },
+    customer: {
+      name: sanitizeText(customer.name, 200),
+      email: customerEmail,
+      phone: sanitizeText(customer.phone || '', 30),
+      address: sanitizeText(customer.address || '', 500),
+      city: sanitizeText(customer.city || '', 120),
+      postalCode: sanitizeText(customer.postalCode || '', 20),
+      country: sanitizeText(customer.country || '', 120),
+    },
     items,
     subtotal,
     shippingCost,
     totalAmount: subtotal + shippingCost,
-    paymentMethod: paymentMethod || 'Direct Export Order Request',
+    paymentMethod: sanitizeText(paymentMethod || 'Direct Export Order Request', 100),
     targetEmail: destinationEmail,
     status: 'Confirmed',
     createdAt: new Date().toISOString()
   };
-  pushBounded(localOrders, orderRecord);
+
+  // Persist first: a failed save is a failed order; a failed email is not.
+  try {
+    await saveOrder(orderRecord);
+  } catch (err) {
+    console.error(`❌ [Orders] Could not save ${orderId} for user ${req.user.id}:`, err.message);
+    return res.status(503).json({ success: false, message: 'We could not place your order right now. Nothing has been charged — please try again.' });
+  }
 
   if (process.env.NODE_ENV !== 'production') {
     console.log(`🛒 New Order [${orderId}] with ${items.length} items → confirmation to ${customerEmail}`);
@@ -1434,7 +1462,7 @@ app.post('/api/orders', requireAuth, async (req, res) => {
   try {
     emailStatus = await sendOrderEmails({
       customerEmail,
-      customerName: customer.name,
+      customerName: orderRecord.customer.name,
       orderId,
       subtotal,
       shippingCost,
@@ -1443,11 +1471,11 @@ app.post('/api/orders', requireAuth, async (req, res) => {
       paymentMethod: orderRecord.paymentMethod,
       placedAt: orderRecord.createdAt,
       shipping: {
-        address: customer.address,
-        city: customer.city,
-        postalCode: customer.postalCode,
-        country: customer.country,
-        phone: customer.phone
+        address: orderRecord.customer.address,
+        city: orderRecord.customer.city,
+        postalCode: orderRecord.customer.postalCode,
+        country: orderRecord.customer.country,
+        phone: orderRecord.customer.phone
       }
     });
   } catch (emailErr) {
@@ -1466,7 +1494,9 @@ app.post('/api/orders', requireAuth, async (req, res) => {
       // instead of assuming the send worked.
       customerEmail: emailStatus.customer?.sent ? emailStatus.customer.to : null,
       adminEmail: emailStatus.admin?.sent ? emailStatus.admin.to : null,
-      detail: emailStatus.success ? undefined : (emailStatus.reason || emailStatus.customer?.error || 'One or more emails failed to send.')
+      // Provider error text stays in the server log (above); the buyer gets a
+      // fixed message, never internal detail.
+      detail: emailStatus.success ? undefined : 'Your order is saved, but the confirmation email could not be sent. Our team has your order.'
     }
   });
 });
@@ -1490,9 +1520,19 @@ app.use(globalExceptionHandler);
 // ── Start Server ──────────────────────────────────────────────────────────────
 // Start Server locally
 if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`CEFI Backend REST API running on http://localhost:${PORT}`);
   });
+
+  // Graceful shutdown: stop accepting connections, let in-flight requests
+  // (e.g. an order mid-save) finish, then exit. Forced after 10 s.
+  const shutdown = (signal) => {
+    console.log(`\n${signal} received — shutting down gracefully…`);
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(1), 10000).unref();
+  };
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
+  process.once('SIGINT', () => shutdown('SIGINT'));
 }
 
 module.exports = app;
