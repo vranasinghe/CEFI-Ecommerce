@@ -24,13 +24,19 @@
  *                        delivers to the account owner — customers get nothing.
  */
 
-const { buildCustomerEmail, buildAdminEmail } = require('./email-templates');
+const { buildCustomerEmail, buildAdminEmail, buildOrderConfirmedEmail } = require('./email-templates');
+
+// The owner's inbox always gets the order alert, even if ADMIN_EMAIL isn't
+// set in this environment. Same fallback address server.js already uses for
+// every other admin notification (test email, contact form, etc.) — order
+// alerts must not be the one path that silently drops it.
+const OWNER_EMAIL = 'ceylonecofreshinfinity@gmail.com';
 
 // Config is read per call, never at import time. If this module is required
 // before dotenv has loaded .env, import-time constants would silently freeze as
 // empty — dropping the admin email and falling back to the sandbox sender.
 function getConfig() {
-  const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER || '';
+  const adminEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER || OWNER_EMAIL;
   return {
     from: process.env.RESEND_FROM_EMAIL || 'CEFI Orders <onboarding@resend.dev>',
     adminEmail,
@@ -245,4 +251,43 @@ async function sendOrderEmails(orderData) {
   return { success, customer: customerResult, admin: adminResult || null, durationMs };
 }
 
-module.exports = { sendOrderEmails, normaliseOrder };
+/**
+ * Sends the "Order Confirmed" notice to the customer only — triggered
+ * manually by an admin from the dashboard, never by a client-supplied
+ * address (the caller passes the order's own stored, verified customerEmail).
+ *
+ * @param {object} orderData same shape as sendOrderEmails()
+ * @returns {Promise<{success:boolean, skipped?:boolean, reason?:string,
+ *                    result?:object}>} Always resolves — never rejects.
+ */
+async function sendOrderConfirmedEmail(orderData) {
+  let order;
+  try {
+    order = normaliseOrder(orderData);
+  } catch (err) {
+    console.error('❌ [OrderConfirmed] invalid orderData:', err.message);
+    return { success: false, skipped: true, reason: err.message };
+  }
+
+  const { from: FROM_ADDRESS, replyTo: REPLY_TO } = getConfig();
+  const client = getResendClient();
+  if (!client) {
+    return { success: false, skipped: true, reason: 'Resend is not configured (RESEND_API_KEY missing)' };
+  }
+
+  const template = buildOrderConfirmedEmail(order);
+  const result = await dispatch(client, 'order-confirmed', {
+    from: FROM_ADDRESS,
+    to: order.customerEmail,
+    replyTo: REPLY_TO,
+    subject: template.subject,
+    html: template.html,
+    text: template.text,
+    tags: [{ name: 'type', value: 'order_confirmed_customer' }],
+  });
+
+  console.log(`📧 [OrderConfirmed] ${order.orderId} → customer:${result.sent ? 'ok' : 'fail'}`);
+  return { success: Boolean(result.sent), result };
+}
+
+module.exports = { sendOrderEmails, sendOrderConfirmedEmail, normaliseOrder };

@@ -197,6 +197,101 @@ function buildCustomerEmail(orderData) {
 }
 
 /**
+ * Customer-facing "Order Confirmed" notice — sent manually by an admin
+ * (Admin Dashboard → Orders → "Send Order Confirmed Email"), once stock and
+ * payment have actually been checked. Deliberately a different message from
+ * buildCustomerEmail()'s automatic "Order Received": that one fires the
+ * instant checkout completes and promises a review; this one is the
+ * follow-up once that review is done, so wording that read as "still
+ * pending" at checkout now reads as final.
+ *
+ * @param {object} orderData normalised order (see email-service.js)
+ * @returns {{subject:string, html:string, text:string}}
+ */
+function buildOrderConfirmedEmail(orderData) {
+  const { customerName, orderId, subtotal, shippingCost, totalAmount, items, currency, placedAt, shipping } = orderData;
+  const destination = addressLine(shipping);
+
+  const body = `
+    <p style="font-size:15px;margin:0 0 6px;">Dear <strong>${escapeHtml(customerName)}</strong>,</p>
+    <p style="font-size:14px;line-height:1.6;color:#475569;margin:0 0 20px;">
+      Good news — <strong>your order is confirmed.</strong> Stock and payment have been
+      checked, and our export team is preparing it for dispatch.
+    </p>
+
+    <div style="background-color:#f0fdf4;padding:12px 16px;border-radius:10px;margin-bottom:20px;">
+      <p style="margin:0;font-size:14px;"><strong>Order Reference:</strong>
+        <span style="font-family:monospace;color:${BRAND.green};font-weight:bold;">${escapeHtml(orderId)}</span>
+      </p>
+      <p style="margin:4px 0 0;font-size:12px;color:#64748b;">Placed: ${escapeHtml(placedAt)}</p>
+    </div>
+
+    <table style="width:100%;border-collapse:collapse;font-size:13px;border:1px solid #e2e8f0;">
+      <thead>
+        <tr style="background-color:#f1f5f9;color:#475569;text-align:left;">
+          <th style="padding:10px 14px;">Product</th>
+          <th style="padding:10px 14px;text-align:center;">Qty</th>
+          <th style="padding:10px 14px;text-align:right;">Unit</th>
+          <th style="padding:10px 14px;text-align:right;">Total</th>
+        </tr>
+      </thead>
+      <tbody>${itemRowsHtml(items, currency)}</tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3" style="padding:8px 14px;text-align:right;color:#64748b;">Subtotal</td>
+          <td style="padding:8px 14px;text-align:right;color:#475569;">${escapeHtml(formatMoney(subtotal, currency))}</td>
+        </tr>
+        <tr>
+          <td colspan="3" style="padding:0 14px 8px;text-align:right;color:#64748b;">Shipping</td>
+          <td style="padding:0 14px 8px;text-align:right;color:#475569;">
+            ${shippingCost > 0 ? escapeHtml(formatMoney(shippingCost, currency)) : 'Free'}
+          </td>
+        </tr>
+        <tr>
+          <td colspan="3" style="padding:12px 14px;text-align:right;font-weight:bold;color:#475569;border-top:1px solid #e2e8f0;">Order Total</td>
+          <td style="padding:12px 14px;text-align:right;font-weight:bold;color:${BRAND.green};font-size:15px;border-top:1px solid #e2e8f0;">
+            ${escapeHtml(formatMoney(totalAmount, currency))}
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+
+    ${
+      destination
+        ? `<div style="background-color:#f8fafc;border-left:4px solid ${BRAND.gold};padding:12px 16px;border-radius:6px;font-size:13px;color:#475569;margin-top:20px;">
+             <strong style="color:${BRAND.green};">Delivery destination</strong><br/>${escapeHtml(destination)}
+           </div>`
+        : ''
+    }
+
+    <p style="font-size:13px;color:#64748b;margin-top:20px;">
+      Questions about dispatch or delivery? Simply reply to this email — it reaches our export team directly.
+    </p>`;
+
+  return {
+    subject: `✅ Order Confirmed [${orderId}] — ${BRAND.short}`,
+    html: layout({ headline: 'Your order is confirmed', subline: 'Order Confirmed', body }),
+    text: [
+      `Dear ${customerName},`,
+      '',
+      `Good news — your order is confirmed. Order reference: ${orderId}.`,
+      'Stock and payment have been checked, and our export team is preparing it for dispatch.',
+      '',
+      'Items:',
+      itemLinesText(items, currency),
+      '',
+      `Subtotal: ${formatMoney(subtotal, currency)}`,
+      `Shipping: ${shippingCost > 0 ? formatMoney(shippingCost, currency) : 'Free'}`,
+      `Order total: ${formatMoney(totalAmount, currency)}`,
+      '',
+      destination ? `Delivery destination: ${destination}` : '',
+      '',
+      BRAND.name,
+    ].join('\n'),
+  };
+}
+
+/**
  * Internal "Order Confirmed" alert for the admin inbox.
  * Tone: operational — leads with the action required, then the detail.
  */
@@ -278,4 +373,4 @@ function buildAdminEmail(orderData) {
   };
 }
 
-module.exports = { buildCustomerEmail, buildAdminEmail, escapeHtml, formatMoney, BRAND };
+module.exports = { buildCustomerEmail, buildAdminEmail, buildOrderConfirmedEmail, escapeHtml, formatMoney, BRAND };
