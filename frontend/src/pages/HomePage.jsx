@@ -4,6 +4,7 @@ import { ArrowRight, ChevronLeft, ChevronRight, Award, ShieldCheck, Truck, Refre
 import CategoryCard from '../components/CategoryCard';
 import ProductCard from '../components/ProductCard';
 import Reveal from '../components/Reveal';
+import { postForm } from '../utils/postForm';
 
 export default function HomePage({ onOpenQuoteModal }) {
   const [categories, setCategories] = useState([]);
@@ -12,6 +13,8 @@ export default function HomePage({ onOpenQuoteModal }) {
   const [carouselDirection, setCarouselDirection] = useState('right');
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
+  const [newsletterSending, setNewsletterSending] = useState(false);
+  const [newsletterError, setNewsletterError] = useState('');
 
   useEffect(() => {
     // Fetch categories
@@ -57,58 +60,19 @@ export default function HomePage({ onOpenQuoteModal }) {
 
   const handleNewsletter = async (e) => {
     e.preventDefault();
-    if (newsletterEmail) {
-      let sent = false;
+    if (!newsletterEmail || newsletterSending) return;
+    setNewsletterSending(true);
+    setNewsletterError('');
 
-      // 1. Backend (Resend) — emails the admin AND sends the subscriber a confirmation.
-      try {
-        const res = await fetch('/api/newsletter', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: newsletterEmail })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success) sent = true;
-        }
-      } catch (err) {}
-
-      // 2. Web3Forms fallback (admin inbox only) if the backend is unreachable
-      if (!sent) {
-        try {
-          const w3Res = await fetch('https://api.web3forms.com/submit', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-            body: JSON.stringify({
-              access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '2a8d834e-5677-4c4c-b610-6844fe2ba187',
-              from_name: "CEFI Newsletter",
-              subject: `📩 [Newsletter] New Subscription: ${newsletterEmail}`,
-              email: newsletterEmail,
-              message: `New subscriber email: ${newsletterEmail}`
-            })
-          });
-          if (w3Res.ok) sent = true;
-        } catch (err) {}
-      }
-
-      // 3. FormSubmit fallback (admin inbox only)
-      if (!sent) {
-        try {
-          await fetch('https://formsubmit.co/ajax/ceylonecofreshinfinity@gmail.com', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-            body: JSON.stringify({
-              _subject: `📩 [Newsletter] New Subscription: ${newsletterEmail}`,
-              email: newsletterEmail
-            })
-          });
-          sent = true;
-        } catch (err) {}
-      }
-
+    // Emails the owner's inbox via the server (Resend).
+    const result = await postForm('/api/newsletter', { email: newsletterEmail });
+    if (result.ok) {
       setNewsletterSubscribed(true);
       setNewsletterEmail('');
+    } else {
+      setNewsletterError(result.message || 'Could not subscribe right now. Please try again in a moment.');
     }
+    setNewsletterSending(false);
   };
 
   const nextCategory = () => {
@@ -555,11 +519,15 @@ export default function HomePage({ onOpenQuoteModal }) {
                   />
                   <button
                     type="submit"
-                    className="w-full sm:w-auto px-8 py-3.5 bg-cefi-green hover:bg-cefi-green-light text-white rounded-full font-serif font-bold text-sm shadow-md transition-all shrink-0"
+                    disabled={newsletterSending}
+                    className="w-full sm:w-auto px-8 py-3.5 bg-cefi-green hover:bg-cefi-green-light disabled:opacity-60 text-white rounded-full font-serif font-bold text-sm shadow-md transition-all shrink-0"
                   >
-                    Subscribe
+                    {newsletterSending ? 'Subscribing…' : 'Subscribe'}
                   </button>
                 </form>
+              )}
+              {newsletterError && !newsletterSubscribed && (
+                <p role="alert" className="text-xs text-red-300 max-w-md mx-auto lg:mx-0">{newsletterError}</p>
               )}
             </div>
 

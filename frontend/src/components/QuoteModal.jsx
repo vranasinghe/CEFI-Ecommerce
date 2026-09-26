@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Send, CheckCircle2, Globe, Building2, PackageCheck } from 'lucide-react';
 import { trackQuoteRequest } from '../utils/analytics';
+import { postForm } from '../utils/postForm';
 
 export default function QuoteModal({ isOpen, onClose, initialProduct = '' }) {
   const [formData, setFormData] = useState({
@@ -25,79 +26,24 @@ export default function QuoteModal({ isOpen, onClose, initialProduct = '' }) {
     setLoading(true);
     setError('');
 
-    let sent = false;
+    // Emails the owner's inbox via the server (Resend).
+    const result = await postForm('/api/quotes', {
+      name: formData.contactPerson,
+      company: formData.companyName,
+      email: formData.email,
+      phone: formData.phone,
+      product: formData.productName,
+      quantity: formData.estimatedQuantity,
+      targetDestination: formData.targetDestination,
+      notes: formData.notes
+    });
 
-    // 1. Backend (Resend) — emails the admin AND sends the buyer a confirmation.
-    try {
-      const res = await fetch('/api/quotes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.contactPerson,
-          company: formData.companyName,
-          email: formData.email,
-          phone: formData.phone,
-          product: formData.productName,
-          quantity: formData.estimatedQuantity,
-          targetDestination: formData.targetDestination,
-          notes: formData.notes
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) sent = true;
-      }
-    } catch (err) {}
-
-    // 2. Web3Forms fallback (admin inbox only) if the backend is unreachable
-    if (!sent) {
-      try {
-        const w3Res = await fetch('https://api.web3forms.com/submit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({
-            access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '2a8d834e-5677-4c4c-b610-6844fe2ba187',
-            from_name: "CEFI Quotes",
-            subject: `📋 [Wholesale Quote] ${formData.companyName || formData.contactPerson} (${formData.productName})`,
-            name: formData.contactPerson,
-            company: formData.companyName,
-            email: formData.email,
-            phone: formData.phone || 'N/A',
-            product: formData.productName,
-            estimated_quantity: formData.estimatedQuantity,
-            destination: formData.targetDestination,
-            notes: formData.notes || 'None'
-          })
-        });
-        const w3Data = await w3Res.json();
-        if (w3Data.success) sent = true;
-      } catch (err) {}
+    if (result.ok) {
+      trackQuoteRequest(formData.productName, formData.companyName);
+      setSubmitted(true);
+    } else {
+      setError(result.message || 'Could not send your quote request. Please email ceylonecofreshinfinity@gmail.com or call +94 714 634 485.');
     }
-
-    // 3. FormSubmit fallback (admin inbox only)
-    if (!sent) {
-      try {
-        await fetch('https://formsubmit.co/ajax/ceylonecofreshinfinity@gmail.com', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({
-            _subject: `📋 [Wholesale Quote] ${formData.companyName || formData.contactPerson} (${formData.productName})`,
-            name: formData.contactPerson,
-            company: formData.companyName,
-            email: formData.email,
-            phone: formData.phone || 'N/A',
-            product: formData.productName,
-            quantity: formData.estimatedQuantity,
-            destination: formData.targetDestination,
-            notes: formData.notes || 'None'
-          })
-        });
-        sent = true;
-      } catch (err) {}
-    }
-
-    trackQuoteRequest(formData.productName, formData.companyName);
-    setSubmitted(true);
     setLoading(false);
   };
 

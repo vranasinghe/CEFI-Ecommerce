@@ -1,65 +1,29 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, Phone, MapPin, Facebook, Instagram, Linkedin, Send, ShieldCheck, Award, Truck } from 'lucide-react';
+import { postForm } from '../utils/postForm';
 
 export default function Footer() {
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [subscribeError, setSubscribeError] = useState('');
 
   const handleSubscribe = async (e) => {
     e.preventDefault();
-    if (email) {
-      let sent = false;
+    if (!email || sending) return;
+    setSending(true);
+    setSubscribeError('');
 
-      // 1. Backend (Resend) — emails the admin AND sends the subscriber a confirmation.
-      try {
-        const res = await fetch('/api/newsletter', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success) sent = true;
-        }
-      } catch (err) {}
-
-      // 2. Web3Forms fallback (admin inbox only) if the backend is unreachable
-      if (!sent) {
-        try {
-          const w3Res = await fetch('https://api.web3forms.com/submit', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-            body: JSON.stringify({
-              access_key: import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || '2a8d834e-5677-4c4c-b610-6844fe2ba187',
-              from_name: "CEFI Newsletter",
-              subject: `📩 [Newsletter] New Subscription: ${email}`,
-              email: email,
-              message: `New subscriber email: ${email}`
-            })
-          });
-          if (w3Res.ok) sent = true;
-        } catch (e) {}
-      }
-
-      // 3. FormSubmit fallback (admin inbox only)
-      if (!sent) {
-        try {
-          await fetch('https://formsubmit.co/ajax/ceylonecofreshinfinity@gmail.com', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-            body: JSON.stringify({
-              _subject: `📩 [Newsletter] New Subscription: ${email}`,
-              email: email
-            })
-          });
-          sent = true;
-        } catch (e) {}
-      }
-
+    // Emails the owner's inbox via the server (Resend).
+    const result = await postForm('/api/newsletter', { email });
+    if (result.ok) {
       setSubscribed(true);
       setEmail('');
+    } else {
+      setSubscribeError(result.message || 'Could not subscribe right now. Please try again.');
     }
+    setSending(false);
   };
 
   return (
@@ -248,11 +212,16 @@ export default function Footer() {
                 />
                 <button
                   type="submit"
-                  className="p-2 bg-cefi-gold hover:bg-cefi-gold-light text-cefi-earth rounded-lg transition-colors shrink-0"
+                  disabled={sending}
+                  aria-label="Subscribe"
+                  className="p-2 bg-cefi-gold hover:bg-cefi-gold-light disabled:opacity-60 text-cefi-earth rounded-lg transition-colors shrink-0"
                 >
                   <Send className="w-3.5 h-3.5" />
                 </button>
               </form>
+            )}
+            {subscribeError && !subscribed && (
+              <p role="alert" className="text-[11px] text-red-300 mt-1.5">{subscribeError}</p>
             )}
           </div>
         </div>
