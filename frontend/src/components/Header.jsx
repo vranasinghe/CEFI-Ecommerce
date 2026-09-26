@@ -72,7 +72,7 @@ export default function Header({ onOpenQuoteModal }) {
             
             {/* Wordmark Image */}
             <div className="relative h-9 w-40 sm:h-12 sm:w-64 shrink-0 transform group-hover:scale-[1.03] transition-transform duration-300">
-              <img src="/logo-text.png" alt="CEFI Wordmark" className="w-full h-full object-contain object-left" style={{ filter: 'drop-shadow(0 1px 4px rgba(31,83,46,0.2))' }} />
+              <img src="/logo-text.png" alt="CEFI Wordmark" className="w-full h-full object-contain object-left [filter:drop-shadow(0_1px_4px_rgba(31,83,46,0.2))]" />
             </div>
           </Link>
 
