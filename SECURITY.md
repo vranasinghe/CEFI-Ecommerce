@@ -12,6 +12,7 @@ Please don't open a public GitHub issue. We aim to reply within 2 business days.
 
 | Layer | Protection |
 |---|---|
+| Sign-in & sessions | All sign-in (email, Google, Facebook) runs on the server (`backend/routes/auth.js`). Tokens live only in **HttpOnly, SameSite=Strict, Secure, `__Host-`** cookies — access token and refresh token in separate cookies; the browser's JavaScript never sees either, and the frontend has no Supabase client. Access tokens older than 15 min are refused and renewed from the refresh cookie (rotated each time). Each session is bound to the browser that signed in; a cookie replayed from another browser revokes that session. Logout revokes **every** session of the account, so all its tokens stop working at once. 5 failed sign-ins for one email in 15 min lock it for 15 min (`auth_login_attempts`). State-changing requests are CSRF-checked. |
 | Admin access | `requireAdmin` on every admin API route. An admin is Supabase `app_metadata.role = 'admin'` or a **confirmed** email in `ADMIN_EMAILS`. No admin email is written in the code. Every allowed/denied request is logged to `admin_audit_log`, which is append-only. |
 | Database | Row Level Security on every table. Browser keys can only **read** the catalogue and blog, and a buyer can read only their own orders. All writes go through the API with the service-role key. |
 | Input | Every request body is validated by a strict Zod schema (`backend/lib/schemas.js`). Unknown fields are rejected. Order prices are recalculated from the catalogue on the server. |
@@ -31,6 +32,7 @@ The full list with explanations is in `backend/.env.example`.
 | `SUPABASE_SERVICE_ROLE_KEY` | yes | Server-side writes. **Never** expose to the browser. |
 | `ADMIN_EMAILS` | yes | Comma-separated admin emails |
 | `ORDER_DATA_KEY` | yes | Encrypts stored customer details |
+| `SESSION_SECRET` | recommended | Key for the browser-binding check on session cookies (falls back to a key derived from the service-role key) |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | recommended | Shared rate limiting |
 | `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `ADMIN_EMAIL` | yes | Order/contact emails |
 
@@ -50,10 +52,15 @@ well. If you lose them, the orders and backups encrypted with them can't be read
 
 These can't be set from code. Check them after any project change:
 
-1. **Authentication → Sessions → access-token lifetime: 900 seconds (15 min).**
-   Refresh-token rotation and reuse detection stay on (the default).
-2. **Settings → JWT Keys:** migrate to **asymmetric signing keys** (RS256/ES256)
-   and revoke the legacy HS256 secret once nothing uses it.
+1. **JWT expiry: 900 seconds (15 min).** The API already refuses access
+   tokens older than 15 min; setting the same limit in Supabase (Project
+   Settings → JWT, or Authentication → Sessions) makes the tokens themselves
+   expire then too. Keep refresh-token rotation and reuse detection on (the
+   default).
+2. **Settings → JWT Keys:** migrate to **asymmetric signing keys** (ES256/RS256)
+   and revoke the legacy HS256 secret once nothing uses it. No code change is
+   needed — the API verifies every token with Supabase, whatever the algorithm.
+   Users are signed out once when the old secret is revoked.
 3. **Authentication → Attack Protection:** enable CAPTCHA (Cloudflare Turnstile)
    for sign-up/sign-in and keep "Confirm email" on.
 4. **Database → Backups:** the Free plan has none. Nightly encrypted backups

@@ -1,42 +1,55 @@
-const supabase = require('../supabaseClient');
 const { recordAdminAction } = require('../lib/audit-log');
+const { resolveSession } = require('../lib/session');
 
 /**
- * Express middleware to verify Supabase JWT token from Authorization header.
- * Proves WHO the caller is — any signed-in customer passes. For admin-only
+ * Express middleware: proves WHO the caller is from the HttpOnly session
+ * cookies (lib/session.js) — any signed-in customer passes. For admin-only
  * routes use requireAdmin, which also checks WHAT they are allowed to do.
+ *
+ * Tokens are accepted ONLY from cookies: there is deliberately no
+ * Authorization-header path, so a token can never be handled by page
+ * JavaScript (Master-Vault items 1–3).
  */
 const requireAuth = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ success: false, message: 'Authentication required. Missing Bearer token.' });
+    const session = await resolveSession(req, res);
+    if (session.error === 'unavailable') {
+      return res.status(503).json({ success: false, message: 'Sign-in is temporarily unavailable. Please try again.' });
     }
-
-    const token = authHeader.split(' ')[1];
-
-    // If Supabase client is initialized, verify the token with it
-    if (supabase) {
-      const { data: { user }, error } = await supabase.auth.getUser(token);
-
-      if (error || !user) {
-        return res.status(401).json({ success: false, message: 'Invalid or expired authentication token.' });
-      }
-
-      // Attach user object to request
-      req.user = user;
-      return next();
-    } else {
-      // For local dev/mockData environment without Supabase
-      // In a real scenario without Supabase, we would verify a standard JWT here (Module 1).
-      // For now, we reject if there's no Supabase but auth is required.
-      return res.status(501).json({ success: false, message: 'Authentication verification is currently only supported via Supabase in this environment.' });
+    if (session.error) {
+      return res.status(401).json({
+        success: false,
+        code: session.error === 'mismatch' ? 'SESSION_ENDED' : 'UNAUTHENTICATED',
+        message: session.error === 'mismatch'
+          ? 'Your session was ended for security reasons. Please sign in again.'
+          : 'Please sign in to continue.',
+      });
     }
+    req.user = session.user;
+    req.sessionId = session.sessionId;
+    return next();
   } catch (err) {
-    console.error('Authentication middleware error:', err);
+    console.error('Authentication middleware error:', err.message);
     return res.status(500).json({ success: false, message: 'Internal server error during authentication.' });
   }
 };
+
+/**
+ * CSRF guard for cookie-authenticated APIs. SameSite=Strict cookies already
+ * aren't sent cross-site; this also refuses any state-changing request the
+ * browser labels as coming from another site (Sec-Fetch-Site), as a second
+ * layer. Requests without the header (non-browser clients) are unaffected —
+ * they can't carry a victim's cookies anyway.
+ */
+function csrfGuard(req, res, next) {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  const site = req.headers['sec-fetch-site'];
+  if (site && site !== 'same-origin' && site !== 'none') {
+    console.warn(`⛔ [csrf] refused ${req.method} ${req.path} (Sec-Fetch-Site: ${site})`);
+    return res.status(403).json({ success: false, message: 'Cross-site request refused.' });
+  }
+  return next();
+}
 
 // Admin allowlist, read per call so it honours env loaded after import (and
 // so a Vercel env-var change takes effect on next request, no redeploy of
@@ -90,5 +103,6 @@ const requireAdmin = (req, res, next) => {
 module.exports = {
   requireAuth,
   requireAdmin,
-  isAdminUser
+  isAdminUser,
+  csrfGuard
 };

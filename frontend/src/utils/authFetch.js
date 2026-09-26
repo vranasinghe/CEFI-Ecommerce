@@ -1,17 +1,13 @@
-import supabase from './supabase';
-
 /**
- * fetch() that attaches the signed-in user's Supabase access token.
- * Admin API routes verify this token server-side and check the admin role,
- * so admin screens must use this rather than plain fetch().
+ * fetch() for API calls that need the signed-in user.
+ *
+ * The session lives in HttpOnly cookies set by the backend, so there is no
+ * token to attach: the browser sends the cookies itself. This wrapper only
+ * makes that explicit (credentials: 'same-origin' is the browser default for
+ * our same-origin /api calls, stated here so it can't silently change).
  */
 export async function authFetch(url, options = {}) {
-  const { data: { session } } = await supabase.auth.getSession();
-  const headers = new Headers(options.headers || {});
-  if (session?.access_token) {
-    headers.set('Authorization', `Bearer ${session.access_token}`);
-  }
-  return fetch(url, { ...options, headers });
+  return fetch(url, { credentials: 'same-origin', ...options });
 }
 
 export default authFetch;

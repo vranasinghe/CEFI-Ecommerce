@@ -79,6 +79,9 @@ module.exports = {
   globalLimiter: makeLimiter('global', { windowMs: 15 * MIN, max: 300, keyGenerator: clientIpKey }),
   // Public forms that send email: tight, per IP.
   formLimiter: makeLimiter('form', { windowMs: 15 * MIN, max: 5, keyGenerator: clientIpKey, message: 'Too many submissions. Please wait a few minutes and try again.' }),
+  // Sign-in / sign-up / OAuth, per IP. Account lockout (lib/login-guard.js)
+  // separately caps guesses against any single email.
+  authLimiter: makeLimiter('auth', { windowMs: 15 * MIN, max: 20, keyGenerator: clientIpKey, message: 'Too many sign-in attempts from this network. Please wait a few minutes.' }),
   // Signed-in API calls, per user (use AFTER requireAuth / requireAdmin).
   userApiLimiter: makeLimiter('user', { windowMs: 1 * MIN, max: 100, keyGenerator: userKey }),
   // Order placement, per user.
