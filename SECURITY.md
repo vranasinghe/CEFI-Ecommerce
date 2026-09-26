@@ -67,6 +67,26 @@ These can't be set from code. Check them after any project change:
    run from GitHub Actions instead (below). On a paid plan, daily backups/PITR
    are included.
 
+## Database lock-down
+
+The browser (public anon key, or a signed-in customer) may only **read** the
+catalogue; every write goes through the API with the service-role key.
+`fix_supabase_security.sql` enforces that and turns on RLS for the older
+tables in `backend/schema.sql`. Run it in the Supabase SQL editor (safe to
+re-run), and again after anyone edits policies by hand. CI (`sql-guard`)
+fails if the script is emptied or starts creating write policies.
+
+Verify at any time — there must be **no** INSERT / UPDATE / DELETE / ALL
+policy for `anon` or `authenticated` on `public` or `storage.objects`:
+
+```sql
+select schemaname, tablename, policyname, cmd, roles from pg_policies
+where schemaname in ('public','storage') order by 1,2;
+```
+
+Public forms (contact, quote, newsletter) email only the owner — they never
+send mail to the address a visitor types, because it is unverified.
+
 ## Backups and restore
 
 - **Nightly:** `.github/workflows/backup.yml` exports all tables, encrypts them

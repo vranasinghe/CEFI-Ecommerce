@@ -967,33 +967,9 @@ ${message}
         html: htmlContent,
       };
 
-      const customerOptions = (email && email !== targetEmail) ? {
-        fromName: 'Ceylon Eco Fresh Infinity',
-        replyTo: targetEmail,
-        to: email,
-        subject: `✅ We received your message, ${name.split(' ')[0]}! — CEFI`,
-        text: `Dear ${name},\n\nThank you for contacting Ceylon Eco Fresh Infinity. We have received your message regarding "${subject}" and our team will respond within 24 hours.\n\nFor urgent matters, contact us at +94 714 634 485.\n\nBest regards,\nCeylon Eco Fresh Infinity Team`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
-            <div style="background-color: #1F532E; color: #ffffff; padding: 24px; text-align: center;">
-              <h2 style="margin: 0; color: #D4AF37; font-size: 22px;">Ceylon Eco Fresh Infinity (Pvt) Ltd</h2>
-              <p style="margin: 6px 0 0; font-size: 13px; color: #d1fae5;">We've received your message!</p>
-            </div>
-            <div style="padding: 24px; color: #334155;">
-              <p style="font-size: 15px; margin: 0 0 16px;">Dear <strong>${name}</strong>,</p>
-              <p style="font-size: 14px; color: #475569; line-height: 1.6;">Thank you for contacting Ceylon Eco Fresh Infinity. We have received your message and our team will get back to you within <strong>24 hours</strong>.</p>
-              <div style="background-color: #f0fdf4; border-left: 4px solid #1F532E; padding: 14px 16px; border-radius: 8px; margin: 20px 0; font-size: 13px; color: #065f46;">
-                <strong>Your Inquiry:</strong> ${subject || 'General Inquiry'}<br/>
-                <strong>Submitted:</strong> ${new Date().toLocaleString()}
-              </div>
-              <p style="font-size: 13px; color: #64748b;">If your matter is urgent, you can reach us directly at <a href="tel:+94714634485" style="color: #1F532E;">+94 714 634 485</a> (WhatsApp available).</p>
-            </div>
-            <div style="background-color: #f8fafc; padding: 14px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
-              Ceylon Eco Fresh Infinity (Pvt) Ltd · No. 278/1/A, Meegasmulla, Dedigamuwa · ceylonecofreshinfinity@gmail.com
-            </div>
-          </div>
-        `
-      } : null;
+      // No acknowledgement is sent to the address the visitor typed: it is unverified,
+      // so the form would relay our domain's email to any inbox with attacker-chosen text.
+      const customerOptions = null;
 
       const result = await sendDualEmails(adminOptions, customerOptions);
       customerSent = result.customerSent;
@@ -1092,27 +1068,9 @@ async function sendNewsletterEmail(email) {
         html: htmlContent,
       };
 
-      const customerOptions = (email && email !== targetEmail) ? {
-        fromName: 'Ceylon Eco Fresh Infinity',
-        replyTo: targetEmail,
-        to: email,
-        subject: `✅ Welcome to the CEFI Newsletter!`,
-        text: `Thank you for subscribing to the Ceylon Eco Fresh Infinity newsletter!`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
-            <div style="background-color: #1F532E; color: #ffffff; padding: 24px; text-align: center;">
-              <h2 style="margin: 0; color: #D4AF37; font-size: 22px;">Ceylon Eco Fresh Infinity (Pvt) Ltd</h2>
-              <p style="margin: 6px 0 0; font-size: 13px; color: #d1fae5;">Subscription Confirmed</p>
-            </div>
-            <div style="padding: 24px; color: #334155;">
-              <p style="font-size: 14px; color: #475569; line-height: 1.6;">Thank you for subscribing to our newsletter! You will now receive our latest updates on Ceylon export products, tea harvests, and spice catalogs directly to your inbox.</p>
-            </div>
-            <div style="background-color: #f8fafc; padding: 14px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
-              Ceylon Eco Fresh Infinity (Pvt) Ltd · No. 278/1/A, Meegasmulla, Dedigamuwa
-            </div>
-          </div>
-        `
-      } : null;
+      // No acknowledgement is sent to the address the visitor typed: it is unverified,
+      // so the form would relay our domain's email to any inbox with attacker-chosen text.
+      const customerOptions = null;
 
       const result = await sendDualEmails(adminOptions, customerOptions);
       customerSent = result.customerSent;
@@ -1205,36 +1163,9 @@ ${notes}
         html: htmlContent,
       };
 
-      const customerOptions = (email && email !== targetEmail) ? {
-        fromName: 'Ceylon Eco Fresh Infinity',
-        replyTo: targetEmail,
-        to: email,
-        subject: `✅ Quote Request Received — ${product} | CEFI`,
-        text: `Dear ${name},\n\nThank you for your quotation request for ${product} (${quantity}) to ${targetDestination}.\n\nOur trade team will respond within 1–2 business days with a detailed proforma invoice.\n\nFor urgent matters, contact us at +94 714 634 485.\n\nBest regards,\nCeylon Eco Fresh Infinity Export Team`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
-            <div style="background-color: #1F532E; color: #ffffff; padding: 24px; text-align: center;">
-              <h2 style="margin: 0; color: #D4AF37; font-size: 22px;">Ceylon Eco Fresh Infinity (Pvt) Ltd</h2>
-              <p style="margin: 6px 0 0; font-size: 13px; color: #d1fae5;">Your quotation request has been received!</p>
-            </div>
-            <div style="padding: 24px; color: #334155;">
-              <p style="font-size: 15px; margin: 0 0 16px;">Dear <strong>${name}</strong>,</p>
-              <p style="font-size: 14px; color: #475569; line-height: 1.6;">Thank you for your interest in our products. We have received your wholesale/export quotation request and our trade team will prepare a detailed quote within <strong>1–2 business days</strong>.</p>
-              <div style="background-color: #f0fdf4; border-left: 4px solid #1F532E; padding: 14px 16px; border-radius: 8px; margin: 20px 0; font-size: 13px; color: #065f46;">
-                <strong>Company:</strong> ${company}<br/>
-                <strong>Product Requested:</strong> ${product}<br/>
-                <strong>Estimated Quantity:</strong> ${quantity}<br/>
-                <strong>Destination:</strong> ${targetDestination}<br/>
-                <strong>Submitted:</strong> ${new Date().toLocaleString()}
-              </div>
-              <p style="font-size: 13px; color: #64748b;">For urgent inquiries, please contact us at <a href="tel:+94714634485" style="color: #1F532E;">+94 714 634 485</a> (WhatsApp available).</p>
-            </div>
-            <div style="background-color: #f8fafc; padding: 14px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
-              Ceylon Eco Fresh Infinity (Pvt) Ltd · No. 278/1/A, Meegasmulla, Dedigamuwa · ceylonecofreshinfinity@gmail.com
-            </div>
-          </div>
-        `
-      } : null;
+      // No acknowledgement is sent to the address the visitor typed: it is unverified,
+      // so the form would relay our domain's email to any inbox with attacker-chosen text.
+      const customerOptions = null;
 
       const result = await sendDualEmails(adminOptions, customerOptions);
       customerSent = result.customerSent;
