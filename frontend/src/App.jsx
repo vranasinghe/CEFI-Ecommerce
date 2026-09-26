@@ -5,11 +5,13 @@ import Footer from './components/Footer';
 import CartDrawer from './components/CartDrawer';
 import QuoteModal from './components/QuoteModal';
 import AdminRoute from './components/AdminRoute';
+import CookieBanner from './components/CookieBanner';
 
 // Context Providers
 import { CartProvider } from './context/CartContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { trackPageView } from './utils/analytics';
+import { initConsent } from './utils/consent';
 
 // Pages
 import HomePage from './pages/HomePage';
@@ -25,6 +27,7 @@ import AccountPage from './pages/AccountPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminProductForm from './pages/AdminProductForm';
 import AuthCallbackPage from './pages/AuthCallbackPage';
+import PrivacyPage from './pages/PrivacyPage';
 
 // Scroll To Top on route change
 function ScrollToTop() {
@@ -65,6 +68,7 @@ function MainLayout({ onOpenQuoteModal, quoteModalOpen, setQuoteModalOpen, selec
           
           {/* OAuth Callback */}
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
 
           {/* Admin Routes - full screen Admin Portal. AdminRoute is a UI gate
               only; the real enforcement is server-side on every admin API call. */}
@@ -80,6 +84,9 @@ function MainLayout({ onOpenQuoteModal, quoteModalOpen, setQuoteModalOpen, selec
       {/* Slide-over Cart Drawer & Quote Modal */}
       {!isAdminRoute && <CartDrawer />}
 
+      {/* Cookie consent (customer site only) */}
+      {!isAdminRoute && <CookieBanner />}
+
       <QuoteModal
         isOpen={quoteModalOpen}
         onClose={() => setQuoteModalOpen(false)}
@@ -92,6 +99,9 @@ function MainLayout({ onOpenQuoteModal, quoteModalOpen, setQuoteModalOpen, selec
 export default function App() {
   const [quoteModalOpen, setQuoteModalOpen] = useState(false);
   const [selectedQuoteProduct, setSelectedQuoteProduct] = useState('');
+
+  // Restore an earlier "Accept" so analytics resumes; does nothing otherwise.
+  useEffect(() => { initConsent(); }, []);
 
   const handleOpenQuoteModal = (productName = '') => {
     setSelectedQuoteProduct(productName || 'Ceylon Spices & Tea Portfolio');

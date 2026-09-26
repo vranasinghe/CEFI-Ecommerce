@@ -1,9 +1,11 @@
 // Lightweight Analytics Event Tracker for CEFI
+import { analyticsAllowed } from './consent';
 
 export const trackEvent = (eventName, eventParams = {}) => {
-  console.log(`[Analytics Event] 📊 ${eventName}`, eventParams);
-  
-  if (window.gtag && typeof window.gtag === 'function') {
+  if (import.meta.env.DEV) console.log(`[Analytics Event] 📊 ${eventName}`, eventParams);
+
+  // Nothing is sent unless the visitor accepted analytics cookies (see consent.js).
+  if (analyticsAllowed() && typeof window.gtag === 'function') {
     window.gtag('event', eventName, eventParams);
   }
 };

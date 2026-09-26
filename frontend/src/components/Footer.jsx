@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, Phone, MapPin, Facebook, Instagram, Linkedin, Send, ShieldCheck, Award, Truck } from 'lucide-react';
+import { openCookieSettings } from '../utils/consent';
 
 export default function Footer() {
   const [email, setEmail] = useState('');
@@ -261,8 +262,12 @@ export default function Footer() {
 
       {/* Bottom Bar */}
       <div className="max-w-[1600px] mx-auto px-4 sm:px-8 lg:px-12 xl:px-16 mt-12 pt-6 border-t border-emerald-900 flex flex-col md:flex-row items-center justify-between text-xs text-emerald-300/60 space-y-4 md:space-y-0">
-        <div>
-          © {new Date().getFullYear()} Ceylon Eco Fresh Infinity (Pvt) Ltd. All rights reserved.
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+          <span>© {new Date().getFullYear()} Ceylon Eco Fresh Infinity (Pvt) Ltd. All rights reserved.</span>
+          <Link to="/privacy" className="hover:text-cefi-gold transition-colors underline-offset-2 hover:underline">Privacy Policy</Link>
+          <button type="button" onClick={openCookieSettings} className="hover:text-cefi-gold transition-colors underline-offset-2 hover:underline">
+            Cookie settings
+          </button>
         </div>
 
         {/* Payment Badges */}
