@@ -1,0 +1,53 @@
+name: Secret rotation reminder
+
+# Makes "rotate keys regularly" (Master-Vault item 75) impossible to forget:
+# every month, if SECURITY.md's rotation log shows no rotation in the last
+# 180 days, this opens (once) a GitHub issue with the checklist to follow.
+
+on:
+  schedule:
+    - cron: '0 3 1 * *'
+  workflow_dispatch: {}
+  push:
+    branches: [ "main" ]
+    paths: [ "SECURITY.md" ]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+      - name: Check the rotation log
+        id: rotation
+        run: |
+          set +e
+          msg="$(node scripts/check-rotation.js)"
+          code=$?
+          echo "$msg"
+          echo "overdue=$([ $code -ne 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "message=$msg" >> "$GITHUB_OUTPUT"
+      - name: Open a reminder issue (once)
+        if: steps.rotation.outputs.overdue == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MESSAGE: ${{ steps.rotation.outputs.message }}
+        run: |
+          if [ -n "$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search 'in:title "Secret rotation overdue"' --json number --jq '.[].number')" ]; then
+            echo "A reminder issue is already open."
+            exit 0
+          fi
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "Secret rotation overdue" --body "$MESSAGE
+
+          Follow **SECURITY.md → Key rotation**:
+          - [ ] Admin password (Supabase → Authentication → Users)
+          - [ ] SUPABASE_SERVICE_ROLE_KEY (Supabase → Settings → API keys → roll; update Vercel + GitHub secret; redeploy)
+          - [ ] RESEND_API_KEY (Resend → API keys; update Vercel; delete old)
+          - [ ] Gmail app password (EMAIL_PASS)
+          - [ ] Then add a dated row to the *Last rotation* table in SECURITY.md — that closes the loop and stops this reminder."

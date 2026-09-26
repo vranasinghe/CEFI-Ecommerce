@@ -80,12 +80,20 @@ These can't be set from code. Check them after any project change:
   node scripts/restore-db.js cefi-backup.enc
   node scripts/restore-db.js cefi-backup.enc --apply --tables=products,categories
   ```
-- **Restore drill (quarterly):** restore the latest backup into a *separate*
-  Supabase project and check the site against it. Record the date below.
+- **Restore drill (quarterly):** restores a backup into a *separate*,
+  throwaway Postgres (never production) and compares every row with the live
+  database. Record the result below.
+  ```bash
+  npm install   # once, at the repo root (installs the drill's Postgres)
+  node scripts/restore-drill.js backups/cefi-backup-YYYY-MM-DD.enc
+  ```
+  Local backups go in `backups/` (git-ignored). Keep a copy of the latest one
+  off this computer too (e.g. encrypted cloud storage); it is useless without
+  `BACKUP_ENCRYPTION_KEY`, so store the key separately.
 
 | Last restore drill | Result | By |
 |---|---|---|
-| _not yet run_ | | |
+| 2026-09-26 | ✅ Passed — live backup (categories 6, products 77, blog_posts 4, orders 0, admin_audit_log 10) restored into a separate Postgres; every row byte-identical to live. Negative test: an altered row was detected. | Security audit |
 
 ## Incident response
 
@@ -128,13 +136,16 @@ key, spam sent from the domain):
 | When | What |
 |---|---|
 | Every PR | CI: build, `secret-scan`, `dependency-audit` must be green |
-| Monthly | Update dependencies (`npm outdated`), review `admin_audit_log` for denied/unknown activity |
-| Quarterly | Security self-audit against the Master-Vault 78-point checklist; restore drill |
-| Yearly | External penetration test. **Next scheduled: 2027-03** |
+| Nightly (automatic) | Encrypted database backup (`backup.yml`) — needs the 3 GitHub secrets above |
+| Monthly (automatic) | **OWASP ZAP scan of the live site** (`security-scan.yml`) — findings are filed as the issue "ZAP security scan report". **Secret-rotation check** (`rotation-reminder.yml`) — opens an issue if nothing was rotated in 180 days |
+| Monthly | Update dependencies (`npm outdated`), review `admin_audit_log` for denied/unknown activity, triage the ZAP issue |
+| Quarterly | Security self-audit against the Master-Vault 78-point checklist; restore drill (`scripts/restore-drill.js`) |
+| Yearly | Manual penetration test by an external tester (target: 2027-03), in addition to the monthly automated scan; everyone with access redoes `SECURITY-TRAINING.md` |
 
 ## Onboarding anyone with admin or code access
 
 - [ ] Read this file.
+- [ ] Complete **`SECURITY-TRAINING.md`** (20 minutes) and add your row to its sign-off log.
 - [ ] Use a unique password + a password manager; never share accounts.
 - [ ] Never put keys, passwords or customer data in code, commits, chat or screenshots.
 - [ ] Run `npm install` at the repo root once (enables the secret-scan pre-commit hook).
