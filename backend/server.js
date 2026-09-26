@@ -185,8 +185,17 @@ try {
 
 // ── Middleware ───────────────────────────────────────────────────────────────
 // Security Headers
-app.use(helmet());
+// Matches the stronger HSTS policy vercel.json sets for the static frontend —
+// for API requests (routed to this function) it's this config that actually
+// reaches the browser, not the vercel.json one (confirmed live: without this,
+// /api responses carried Helmet's weaker default instead).
+app.use(helmet({ hsts: { maxAge: 63072000, includeSubDomains: true, preload: true } }));
 app.use(helmet.crossOriginResourcePolicy({ policy: "cross-origin" }));
+
+// No API response is ever cacheable — several depend on the caller's session
+// (e.g. /api/auth/me), and caching one would risk serving one user's data to
+// another. private stops shared/CDN caches; no-store stops the browser too.
+app.use('/api', (req, res, next) => { res.setHeader('Cache-Control', 'private, no-store'); next(); });
 
 // Rate limiting (lib/rate-limit.js): per-IP for anonymous traffic, per-user
 // once signed in; shared across serverless instances when Upstash is set.

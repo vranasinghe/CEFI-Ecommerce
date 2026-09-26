@@ -1,2 +1,7 @@
 10096	IGNORE	(Timestamp Disclosure - Unix: product/order IDs and cache-busting numbers, not server clock leaks)
 10027	IGNORE	(Information Disclosure - Suspicious Comments: minified third-party bundles; reviewed manually)
+90003	IGNORE	(Sub Resource Integrity Missing: only fires on https://www.googletagmanager.com/gtag/js. Google updates this file server-side and explicitly advises against pinning it with SRI. Mitigated instead by CSP script-src, which allow-lists exactly this origin.)
+10017	IGNORE	(Cross-Domain JavaScript Source File Inclusion: same googletagmanager.com script as above, for the same reason.)
+90005	IGNORE	(Sec-Fetch-* Header is Missing: these are REQUEST headers a browser sends; there is no response header for the server to set. Fires because ZAP's own scanning client omits them, not a site misconfiguration.)
+10109	IGNORE	(Modern Web Application: informational only — correctly identifies this as a React SPA. Not a finding.)
+120000	IGNORE	(Information in Browser localStorage: cefi_user is a display-only profile cache (name/email/avatar — no token, checked in backend/lib/session.js's cookie-only design); cefi_cart and cefi_catalog_profile are public catalogue data. Session tokens are HttpOnly cookies, never localStorage.)
