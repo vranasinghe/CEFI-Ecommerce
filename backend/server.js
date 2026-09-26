@@ -10,12 +10,12 @@ const { requireAuth, requireAdmin, csrfGuard } = require('./middleware/auth');
 const authRouter = require('./routes/auth');
 const { sanitizeText, sanitizeHtml, sanitizeHeader, isValidEmail, isValidString } = require('./lib/sanitize');
 require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
-const { sendOrderEmails } = require('./lib/order-email-service');
+const { sendOrderEmails, sendOrderConfirmedEmail } = require('./lib/order-email-service');
 const { globalExceptionHandler, notFoundHandler, setupProcessErrorHandlers } = require('./lib/error-handler');
 const { globalLimiter, formLimiter, userApiLimiter, orderLimiter, uploadLimiter } = require('./lib/rate-limit');
 const schemas = require('./lib/schemas');
 const { validateBody } = schemas;
-const { saveOrder, listOrders } = require('./lib/orders-repo');
+const { saveOrder, listOrders, findOrder } = require('./lib/orders-repo');
 
 // ── Process-level guards (unhandledRejection / uncaughtException) ────────────
 // Must run before any async code so nothing slips through.
@@ -1315,6 +1315,62 @@ app.get('/api/orders', requireAdmin, userApiLimiter, async (req, res) => {
   }
 });
 
+// Admin-only: manually (re)sends the "Order Confirmed" notice to the buyer.
+// The recipient is always the order's own stored, verified email — never
+// anything from the request — so this can't be turned into an email relay.
+app.post('/api/orders/:orderId/send-confirmation', requireAdmin, userApiLimiter, async (req, res) => {
+  const orderId = String(req.params.orderId || '').trim();
+  if (!/^CEFI-ORD-[0-9A-F]{8}$/i.test(orderId)) {
+    return res.status(400).json({ success: false, message: 'Invalid order ID.' });
+  }
+
+  let order;
+  try {
+    order = await findOrder(orderId);
+  } catch (err) {
+    console.error(`❌ [Orders] lookup failed for ${orderId}:`, err.message);
+    return res.status(503).json({ success: false, message: 'Could not look up the order right now. Please try again.' });
+  }
+  if (!order) return res.status(404).json({ success: false, message: 'Order not found.' });
+  if (!order.customer?.email || !isValidEmail(order.customer.email)) {
+    return res.status(422).json({ success: false, message: 'This order has no valid customer email on file.' });
+  }
+
+  let emailResult;
+  try {
+    emailResult = await sendOrderConfirmedEmail({
+      customerEmail: order.customer.email,
+      customerName: order.customer.name,
+      orderId: order.orderId,
+      subtotal: order.subtotal,
+      shippingCost: order.shippingCost,
+      totalAmount: order.totalAmount,
+      items: order.items,
+      paymentMethod: order.paymentMethod,
+      placedAt: order.createdAt,
+      shipping: {
+        address: order.customer.address,
+        city: order.customer.city,
+        postalCode: order.customer.postalCode,
+        country: order.customer.country,
+        phone: order.customer.phone,
+      },
+    });
+  } catch (err) {
+    console.error(`❌ [Orders] send-confirmation failed for ${orderId}:`, err.message);
+    return res.status(503).json({ success: false, message: 'Could not send the email right now. Please try again.' });
+  }
+
+  if (!emailResult.success) {
+    return res.status(502).json({
+      success: false,
+      message: emailResult.skipped ? 'Email sending is not configured on the server.' : 'The email could not be sent. Please try again.',
+    });
+  }
+  console.log(`📧 [Orders] Order Confirmed email sent for ${orderId} to ${order.customer.email}`);
+  return res.json({ success: true, message: 'Confirmation email sent.', sentTo: order.customer.email });
+});
+
 // ── Shipping rule ─────────────────────────────────────────────────────────────
 // Mirrors the frontend rule (free over $100). Recomputed server-side: the
 // client's figures are display values and must never be trusted for billing.
@@ -1356,6 +1412,13 @@ async function priceOrderItems(rawItems) {
       name: product.name,
       price: Number(product.price) || 0,
       quantity,
+      // The buyer's chosen variant. This storefront quotes by quantity, type
+      // and size — not a fixed listed price — so these are what the order
+      // record and both order emails actually lead with; already length- and
+      // shape-checked by schemas.orderSchema, sanitized here like any other
+      // free-text field before it is stored or interpolated into an email.
+      type: sanitizeText(raw.type || '', 80),
+      size: sanitizeText(raw.size || '', 80),
     });
   }
   return { items };

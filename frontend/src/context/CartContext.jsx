@@ -7,7 +7,13 @@ export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState(() => {
     try {
       const saved = localStorage.getItem('cefi_cart');
-      return saved ? JSON.parse(saved) : [];
+      const parsed = saved ? JSON.parse(saved) : [];
+      // Backfill lineId for a basket saved by an older build, before each
+      // line carried its own type/size identity.
+      return parsed.map(item => ({
+        ...item,
+        lineId: item.lineId || `${item.id}::${item.type || ''}::${item.size || ''}`,
+      }));
     } catch (e) {
       return [];
     }
@@ -23,15 +29,25 @@ export const CartProvider = ({ children }) => {
     }
   }, [cart]);
 
+  // This storefront quotes by quantity, type and size — not a fixed listed
+  // price — so the buyer's variant pick from the product page is part of a
+  // cart line's identity: "Cinnamon / 250g" and "Cinnamon / 1kg" are two
+  // separate lines, each with its own quantity, not one merged line.
+  // lineId is stored on the item itself so components can key/select/remove
+  // a line without knowing how that identity is built.
+  const makeLineId = (id, type, size) => `${id}::${type || ''}::${size || ''}`;
+
   const addToCart = (product, quantity = 1) => {
+    const lineId = makeLineId(product.id, product.selectedType, product.selectedSize);
     setCart(prevCart => {
-      const existingIndex = prevCart.findIndex(item => item.id === product.id);
+      const existingIndex = prevCart.findIndex(item => item.lineId === lineId);
       if (existingIndex > -1) {
         const updated = [...prevCart];
         updated[existingIndex].quantity += quantity;
         return updated;
       }
       return [...prevCart, {
+        lineId,
         id: product.id,
         name: product.name,
         slug: product.slug,
@@ -39,6 +55,8 @@ export const CartProvider = ({ children }) => {
         price: product.price,
         image: product.images && product.images.length > 0 ? product.images[0] : '',
         quantity,
+        type: product.selectedType || '',
+        size: product.selectedSize || '',
         is_wholesale_only: product.is_wholesale_only || false
       }];
     });
@@ -47,18 +65,18 @@ export const CartProvider = ({ children }) => {
     setIsCartOpen(true);
   };
 
-  const removeFromCart = (productId) => {
-    setCart(prevCart => prevCart.filter(item => item.id !== productId));
+  const removeFromCart = (lineId) => {
+    setCart(prevCart => prevCart.filter(item => item.lineId !== lineId));
   };
 
-  const updateQuantity = (productId, quantity) => {
+  const updateQuantity = (lineId, quantity) => {
     if (quantity <= 0) {
-      removeFromCart(productId);
+      removeFromCart(lineId);
       return;
     }
     setCart(prevCart =>
       prevCart.map(item =>
-        item.id === productId ? { ...item, quantity } : item
+        item.lineId === lineId ? { ...item, quantity } : item
       )
     );
   };

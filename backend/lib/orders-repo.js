@@ -93,4 +93,35 @@ async function listOrders(limit = 200) {
   });
 }
 
-module.exports = { saveOrder, listOrders };
+/** Single order by its app-level ID, or null. Same shape as listOrders(). */
+async function findOrder(orderId) {
+  if (!persistent()) return localOrders.find((o) => o.orderId === orderId) || null;
+
+  const { data, error } = await supabase
+    .from('orders')
+    .select('order_id, user_id, customer_enc, items, subtotal, shipping_cost, total_amount, payment_method, status, created_at')
+    .eq('order_id', orderId)
+    .maybeSingle();
+  if (error) {
+    if (markMissingIfSchemaError(error)) return localOrders.find((o) => o.orderId === orderId) || null;
+    throw new Error(`Could not load order: ${error.message}`);
+  }
+  if (!data) return null;
+
+  let customer;
+  try { customer = decryptJson(data.customer_enc, orderKey()); } catch { customer = { name: '(could not decrypt — check ORDER_DATA_KEY)' }; }
+  return {
+    orderId: data.order_id,
+    userId: data.user_id,
+    customer,
+    items: data.items,
+    subtotal: Number(data.subtotal),
+    shippingCost: Number(data.shipping_cost),
+    totalAmount: Number(data.total_amount),
+    paymentMethod: data.payment_method,
+    status: data.status,
+    createdAt: data.created_at,
+  };
+}
+
+module.exports = { saveOrder, listOrders, findOrder };
