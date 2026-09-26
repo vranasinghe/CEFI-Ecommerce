@@ -4,7 +4,7 @@ import { CheckCircle2, Mail, Send, Loader2, Lock, AlertTriangle } from 'lucide-r
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import LoginPromptModal from '../components/LoginPromptModal';
-import supabase from '../utils/supabase';
+import { authFetch } from '../utils/authFetch';
 
 const COMPANY_ORDER_EMAIL = 'ceylonecofreshinfinity@gmail.com';
 
@@ -53,10 +53,9 @@ export default function CheckoutPage() {
     setLoading(true);
     setSubmitError(null);
 
-    // The backend identifies the buyer from this verified session, not from
-    // the form — so an order can only ever confirm to the account's own email.
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) {
+    // The backend identifies the buyer from the session cookie, not from the
+    // form — so an order can only ever confirm to the account's own email.
+    if (!user) {
       setSubmitError('Your session has expired. Please sign in again to place your order.');
       setLoading(false);
       return;
@@ -69,12 +68,9 @@ export default function CheckoutPage() {
     // recorded, so we say so and keep the cart.
     let apiData;
     try {
-      const apiRes = await fetch('/api/orders', {
+      const apiRes = await authFetch('/api/orders', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         // Exactly the fields the API accepts: it validates strictly, and it
         // prices items itself, so only product + quantity are sent.
         body: JSON.stringify({

@@ -6,7 +6,8 @@ const nodemailer = require('nodemailer');
 const { Resend } = require('resend');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
-const { requireAuth, requireAdmin, isAdminUser } = require('./middleware/auth');
+const { requireAuth, requireAdmin, csrfGuard } = require('./middleware/auth');
+const authRouter = require('./routes/auth');
 const { sanitizeText, sanitizeHtml, sanitizeHeader, isValidEmail, isValidString } = require('./lib/sanitize');
 require('dotenv').config({ path: require('path').resolve(__dirname, '.env') });
 const { sendOrderEmails } = require('./lib/order-email-service');
@@ -246,12 +247,18 @@ app.use(cors((req, callback) => {
   callback(null, {
     origin: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    // No Authorization header: tokens are accepted only from HttpOnly cookies.
+    allowedHeaders: ['Content-Type'],
     credentials: true,
   });
 }));
 app.use(express.json({ limit: '1mb' }));  // Vault Module 4: 1MB hard cap
 app.use(cookieParser());
+
+// Sessions live in HttpOnly cookies (lib/session.js), so every state-changing
+// API call is CSRF-checked, and sign-in/sign-out/OAuth run here on the server.
+app.use('/api', csrfGuard);
+app.use('/api/auth', authRouter);
 app.use('/uploads', express.static(uploadsDir));
 
 // ── Debug: deployment config (admin-only — reveals env layout and origins) ──
@@ -309,23 +316,6 @@ app.get('/api/test-email', requireAdmin, userApiLimiter, async (req, res) => {
     smtpConfigured: Boolean(mailTransporter),
     resendFrom: RESEND_FROM_EMAIL,
     dispatchResult
-  });
-});
-
-// ── Current user / admin status ───────────────────────────────────────────────
-// The single source of truth for "is this user an admin" is ADMIN_EMAILS /
-// app_metadata.role on the backend (see middleware/auth.js). The frontend
-// never hardcodes an admin email — it asks here instead, every time it needs
-// to know, so a tampered localStorage value can never grant admin UI access.
-app.get('/api/auth/me', requireAuth, userApiLimiter, (req, res) => {
-  res.json({
-    success: true,
-    user: {
-      id: req.user.id,
-      email: req.user.email,
-      emailConfirmed: Boolean(req.user.email_confirmed_at),
-      isAdmin: isAdminUser(req.user),
-    }
   });
 });
 
