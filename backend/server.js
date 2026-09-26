@@ -1412,6 +1412,13 @@ async function priceOrderItems(rawItems) {
       name: product.name,
       price: Number(product.price) || 0,
       quantity,
+      // The buyer's chosen variant. This storefront quotes by quantity, type
+      // and size — not a fixed listed price — so these are what the order
+      // record and both order emails actually lead with; already length- and
+      // shape-checked by schemas.orderSchema, sanitized here like any other
+      // free-text field before it is stored or interpolated into an email.
+      type: sanitizeText(raw.type || '', 80),
+      size: sanitizeText(raw.size || '', 80),
     });
   }
   return { items };

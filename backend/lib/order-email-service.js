@@ -105,6 +105,10 @@ function normaliseOrder(orderData) {
   const normalisedItems = items.map((item) => ({
     name: item.name ?? item.title ?? 'Item',
     quantity: Number(item.quantity) || 1,
+    // This storefront quotes by quantity, type and size — not a fixed listed
+    // price — so these are what the templates actually display per line.
+    type: item.type ?? item.variant ?? '',
+    size: item.size ?? '',
     price: Number(item.price ?? item.unitPrice) || 0,
   }));
 

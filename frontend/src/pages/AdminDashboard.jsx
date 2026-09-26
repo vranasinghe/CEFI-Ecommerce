@@ -832,9 +832,11 @@ export default function AdminDashboard() {
                           Ordered Items ({ord.items?.length || 0})
                         </span>
                         {ord.items?.map((item, idx) => (
-                          <div key={idx} className="flex justify-between items-center text-xs">
-                            <span className="text-cefi-earth font-medium">• {item.name} × {item.quantity}</span>
-                            <span className="font-bold text-cefi-green">${(item.price * item.quantity).toFixed(2)}</span>
+                          <div key={idx} className="flex justify-between items-center text-xs gap-2">
+                            <span className="text-cefi-earth font-medium">• {item.name}</span>
+                            <span className="text-gray-500 text-right">
+                              {[item.type, item.size].filter(Boolean).join(' · ') || '—'} · Qty: <strong className="text-cefi-green">{item.quantity}</strong>
+                            </span>
                           </div>
                         ))}
                       </div>
