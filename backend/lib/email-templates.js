@@ -47,11 +47,6 @@ function formatMoney(amount, currency = 'USD') {
   }
 }
 
-/** Line total for an item, tolerating missing price/quantity. */
-function lineTotal(item) {
-  return (Number(item.price) || 0) * (Number(item.quantity) || 0);
-}
-
 /** Flattens the shipping object into a single readable address line. */
 function addressLine(shipping) {
   if (!shipping) return '';
@@ -60,30 +55,47 @@ function addressLine(shipping) {
     .join(', ');
 }
 
-/** Shared <tbody> rows for the order line-items table. */
-function itemRowsHtml(items, currency) {
+/**
+ * Shared <tbody> rows for the order line-items table.
+ *
+ * This storefront quotes by quantity, type and size — not a fixed listed
+ * price — so that is what every order email leads with per line. There is
+ * deliberately no price/total column: the buyer and the export team settle
+ * that by replying on this same email thread.
+ */
+function itemRowsHtml(items) {
   return items
     .map(
       (item) => `
       <tr>
         <td style="padding:10px 14px;border-bottom:1px solid #eee;color:#1F532E;font-weight:600;">${escapeHtml(item.name)}</td>
-        <td style="padding:10px 14px;border-bottom:1px solid #eee;text-align:center;color:#475569;">${escapeHtml(item.quantity)}</td>
-        <td style="padding:10px 14px;border-bottom:1px solid #eee;text-align:right;color:#475569;">${escapeHtml(formatMoney(item.price, currency))}</td>
-        <td style="padding:10px 14px;border-bottom:1px solid #eee;text-align:right;color:#1F532E;font-weight:600;">${escapeHtml(formatMoney(lineTotal(item), currency))}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #eee;color:#475569;">${escapeHtml(item.type) || '—'}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #eee;color:#475569;">${escapeHtml(item.size) || '—'}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #eee;text-align:center;color:#1F532E;font-weight:600;">${escapeHtml(item.quantity)}</td>
       </tr>`
     )
     .join('');
 }
 
 /** Plain-text line items — the text/plain part every email should carry. */
-function itemLinesText(items, currency) {
+function itemLinesText(items) {
   return items
-    .map(
-      (item) =>
-        `• ${item.name} — ${item.quantity} x ${formatMoney(item.price, currency)} = ${formatMoney(lineTotal(item), currency)}`
-    )
+    .map((item) => {
+      const variant = [item.type, item.size].filter(Boolean).join(' / ');
+      return `• ${item.name}${variant ? ` (${variant})` : ''} — Qty: ${item.quantity}`;
+    })
     .join('\n');
 }
+
+/** Shared note replacing a price/total: this is a quote-by-email business. */
+const QUOTE_NOTE_HTML = `
+    <div style="background-color:#f8fafc;border-left:4px solid #94a3b8;padding:12px 16px;border-radius:6px;font-size:13px;color:#475569;margin-top:16px;">
+      Pricing and final shipping cost are confirmed by our export team based on the
+      quantity, type and size above — simply reply to this email to discuss and agree them.
+    </div>`;
+const QUOTE_NOTE_TEXT =
+  'Pricing and final shipping cost are confirmed by our export team based on the quantity, ' +
+  'type and size above — reply to this email to discuss and agree them.';
 
 /** Outer shell: header band, body slot, footer. Shared by both emails. */
 function layout({ headline, subline, body }) {
@@ -113,14 +125,14 @@ function layout({ headline, subline, body }) {
  * @returns {{subject:string, html:string, text:string}}
  */
 function buildCustomerEmail(orderData) {
-  const { customerName, orderId, subtotal, shippingCost, totalAmount, items, currency, placedAt, shipping } = orderData;
+  const { customerName, orderId, items, placedAt, shipping } = orderData;
   const destination = addressLine(shipping);
 
   const body = `
     <p style="font-size:15px;margin:0 0 6px;">Dear <strong>${escapeHtml(customerName)}</strong>,</p>
     <p style="font-size:14px;line-height:1.6;color:#475569;margin:0 0 20px;">
       Thank you for your order. We have received it and our team will confirm stock
-      availability and dispatch details within <strong>24 hours</strong>.
+      availability, pricing and dispatch details within <strong>24 hours</strong>.
     </p>
 
     <div style="background-color:#f0fdf4;padding:12px 16px;border-radius:10px;margin-bottom:20px;">
@@ -134,31 +146,14 @@ function buildCustomerEmail(orderData) {
       <thead>
         <tr style="background-color:#f1f5f9;color:#475569;text-align:left;">
           <th style="padding:10px 14px;">Product</th>
+          <th style="padding:10px 14px;">Type</th>
+          <th style="padding:10px 14px;">Size</th>
           <th style="padding:10px 14px;text-align:center;">Qty</th>
-          <th style="padding:10px 14px;text-align:right;">Unit</th>
-          <th style="padding:10px 14px;text-align:right;">Total</th>
         </tr>
       </thead>
-      <tbody>${itemRowsHtml(items, currency)}</tbody>
-      <tfoot>
-        <tr>
-          <td colspan="3" style="padding:8px 14px;text-align:right;color:#64748b;">Subtotal</td>
-          <td style="padding:8px 14px;text-align:right;color:#475569;">${escapeHtml(formatMoney(subtotal, currency))}</td>
-        </tr>
-        <tr>
-          <td colspan="3" style="padding:0 14px 8px;text-align:right;color:#64748b;">Shipping</td>
-          <td style="padding:0 14px 8px;text-align:right;color:#475569;">
-            ${shippingCost > 0 ? escapeHtml(formatMoney(shippingCost, currency)) : 'Free'}
-          </td>
-        </tr>
-        <tr>
-          <td colspan="3" style="padding:12px 14px;text-align:right;font-weight:bold;color:#475569;border-top:1px solid #e2e8f0;">Order Total</td>
-          <td style="padding:12px 14px;text-align:right;font-weight:bold;color:${BRAND.green};font-size:15px;border-top:1px solid #e2e8f0;">
-            ${escapeHtml(formatMoney(totalAmount, currency))}
-          </td>
-        </tr>
-      </tfoot>
+      <tbody>${itemRowsHtml(items)}</tbody>
     </table>
+    ${QUOTE_NOTE_HTML}
 
     ${
       destination
@@ -181,11 +176,9 @@ function buildCustomerEmail(orderData) {
       `Thank you for your order. Your order reference is ${orderId}.`,
       '',
       'Items:',
-      itemLinesText(items, currency),
+      itemLinesText(items),
       '',
-      `Subtotal: ${formatMoney(subtotal, currency)}`,
-      `Shipping: ${shippingCost > 0 ? formatMoney(shippingCost, currency) : 'Free'}`,
-      `Order total: ${formatMoney(totalAmount, currency)}`,
+      QUOTE_NOTE_TEXT,
       '',
       destination ? `Delivery destination: ${destination}` : '',
       '',
@@ -197,12 +190,88 @@ function buildCustomerEmail(orderData) {
 }
 
 /**
+ * Customer-facing "Order Confirmed" notice — sent manually by an admin
+ * (Admin Dashboard → Orders → "Send Order Confirmed Email"), once stock and
+ * payment have actually been checked. Deliberately a different message from
+ * buildCustomerEmail()'s automatic "Order Received": that one fires the
+ * instant checkout completes and promises a review; this one is the
+ * follow-up once that review is done, so wording that read as "still
+ * pending" at checkout now reads as final.
+ *
+ * @param {object} orderData normalised order (see email-service.js)
+ * @returns {{subject:string, html:string, text:string}}
+ */
+function buildOrderConfirmedEmail(orderData) {
+  const { customerName, orderId, items, placedAt, shipping } = orderData;
+  const destination = addressLine(shipping);
+
+  const body = `
+    <p style="font-size:15px;margin:0 0 6px;">Dear <strong>${escapeHtml(customerName)}</strong>,</p>
+    <p style="font-size:14px;line-height:1.6;color:#475569;margin:0 0 20px;">
+      Good news — <strong>your order is confirmed.</strong> Stock has been checked, and our
+      export team is preparing it for dispatch.
+    </p>
+
+    <div style="background-color:#f0fdf4;padding:12px 16px;border-radius:10px;margin-bottom:20px;">
+      <p style="margin:0;font-size:14px;"><strong>Order Reference:</strong>
+        <span style="font-family:monospace;color:${BRAND.green};font-weight:bold;">${escapeHtml(orderId)}</span>
+      </p>
+      <p style="margin:4px 0 0;font-size:12px;color:#64748b;">Placed: ${escapeHtml(placedAt)}</p>
+    </div>
+
+    <table style="width:100%;border-collapse:collapse;font-size:13px;border:1px solid #e2e8f0;">
+      <thead>
+        <tr style="background-color:#f1f5f9;color:#475569;text-align:left;">
+          <th style="padding:10px 14px;">Product</th>
+          <th style="padding:10px 14px;">Type</th>
+          <th style="padding:10px 14px;">Size</th>
+          <th style="padding:10px 14px;text-align:center;">Qty</th>
+        </tr>
+      </thead>
+      <tbody>${itemRowsHtml(items)}</tbody>
+    </table>
+    ${QUOTE_NOTE_HTML}
+
+    ${
+      destination
+        ? `<div style="background-color:#f8fafc;border-left:4px solid ${BRAND.gold};padding:12px 16px;border-radius:6px;font-size:13px;color:#475569;margin-top:20px;">
+             <strong style="color:${BRAND.green};">Delivery destination</strong><br/>${escapeHtml(destination)}
+           </div>`
+        : ''
+    }
+
+    <p style="font-size:13px;color:#64748b;margin-top:20px;">
+      Questions about dispatch, delivery or the final quote? Simply reply to this email — it reaches our export team directly.
+    </p>`;
+
+  return {
+    subject: `✅ Order Confirmed [${orderId}] — ${BRAND.short}`,
+    html: layout({ headline: 'Your order is confirmed', subline: 'Order Confirmed', body }),
+    text: [
+      `Dear ${customerName},`,
+      '',
+      `Good news — your order is confirmed. Order reference: ${orderId}.`,
+      'Stock has been checked, and our export team is preparing it for dispatch.',
+      '',
+      'Items:',
+      itemLinesText(items),
+      '',
+      QUOTE_NOTE_TEXT,
+      '',
+      destination ? `Delivery destination: ${destination}` : '',
+      '',
+      BRAND.name,
+    ].join('\n'),
+  };
+}
+
+/**
  * Internal "Order Confirmed" alert for the admin inbox.
  * Tone: operational — leads with the action required, then the detail.
  */
 function buildAdminEmail(orderData) {
-  const { customerName, customerEmail, orderId, subtotal, shippingCost, totalAmount, items,
-          currency, placedAt, paymentMethod, shipping } = orderData;
+  const { customerName, customerEmail, orderId, items,
+          placedAt, paymentMethod, shipping } = orderData;
 
   const itemCount = items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
   const destination = addressLine(shipping);
@@ -211,7 +280,7 @@ function buildAdminEmail(orderData) {
   const body = `
     <div style="background-color:#fff7ed;border-left:4px solid ${BRAND.gold};padding:12px 16px;border-radius:6px;margin-bottom:20px;">
       <p style="margin:0;font-size:14px;color:#92400e;">
-        <strong>Action required:</strong> confirm stock, then send the proforma invoice to the customer within 24 hours.
+        <strong>Action required:</strong> confirm stock and quote the customer by quantity, type and size, then reply within 24 hours.
       </p>
     </div>
 
@@ -232,34 +301,17 @@ function buildAdminEmail(orderData) {
       <thead>
         <tr style="background-color:#f1f5f9;color:#475569;text-align:left;">
           <th style="padding:10px 14px;">Product</th>
+          <th style="padding:10px 14px;">Type</th>
+          <th style="padding:10px 14px;">Size</th>
           <th style="padding:10px 14px;text-align:center;">Qty</th>
-          <th style="padding:10px 14px;text-align:right;">Unit</th>
-          <th style="padding:10px 14px;text-align:right;">Total</th>
         </tr>
       </thead>
-      <tbody>${itemRowsHtml(items, currency)}</tbody>
-      <tfoot>
-        <tr>
-          <td colspan="3" style="padding:8px 14px;text-align:right;color:#64748b;">Subtotal</td>
-          <td style="padding:8px 14px;text-align:right;color:#475569;">${escapeHtml(formatMoney(subtotal, currency))}</td>
-        </tr>
-        <tr>
-          <td colspan="3" style="padding:0 14px 8px;text-align:right;color:#64748b;">Shipping</td>
-          <td style="padding:0 14px 8px;text-align:right;color:#475569;">
-            ${shippingCost > 0 ? escapeHtml(formatMoney(shippingCost, currency)) : 'Free'}
-          </td>
-        </tr>
-        <tr>
-          <td colspan="3" style="padding:12px 14px;text-align:right;font-weight:bold;color:#475569;border-top:1px solid #e2e8f0;">Order Value</td>
-          <td style="padding:12px 14px;text-align:right;font-weight:bold;color:${BRAND.green};font-size:15px;border-top:1px solid #e2e8f0;">
-            ${escapeHtml(formatMoney(totalAmount, currency))}
-          </td>
-        </tr>
-      </tfoot>
-    </table>`;
+      <tbody>${itemRowsHtml(items)}</tbody>
+    </table>
+    ${QUOTE_NOTE_HTML}`;
 
   return {
-    subject: `🛒 Order Confirmed [${orderId}] — ${customerName} · ${formatMoney(totalAmount, currency)}`,
+    subject: `🛒 Order Confirmed [${orderId}] — ${customerName} · ${itemCount} unit(s)`,
     html: layout({ headline: 'New sale — order confirmed', subline: 'Internal Sales Alert', body }),
     text: [
       `New order ${orderId} (${placedAt})`,
@@ -269,13 +321,11 @@ function buildAdminEmail(orderData) {
       `Payment: ${paymentMethod}`,
       '',
       'Items:',
-      itemLinesText(items, currency),
+      itemLinesText(items),
       '',
-      `Order value: ${formatMoney(totalAmount, currency)}`,
-      '',
-      'Action required: confirm stock and send the proforma invoice.',
+      'Action required: confirm stock and quote the customer by quantity, type and size.',
     ].join('\n'),
   };
 }
 
-module.exports = { buildCustomerEmail, buildAdminEmail, escapeHtml, formatMoney, BRAND };
+module.exports = { buildCustomerEmail, buildAdminEmail, buildOrderConfirmedEmail, escapeHtml, formatMoney, BRAND };

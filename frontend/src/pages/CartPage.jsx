@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import LoginPromptModal from '../components/LoginPromptModal';
 
 export default function CartPage() {
-  const { cart, updateQuantity, removeFromCart, cartTotal, clearCart } = useCart();
+  const { cart, updateQuantity, removeFromCart, clearCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loginModalOpen, setLoginModalOpen] = useState(false);
@@ -19,8 +19,7 @@ export default function CartPage() {
     }
   };
 
-  const shippingCost = cartTotal > 100 || cartTotal === 0 ? 0 : 15.00;
-  const grandTotal = cartTotal + shippingCost;
+  const totalUnits = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   if (cart.length === 0) {
     return (
@@ -60,8 +59,8 @@ export default function CartPage() {
         {/* Cart Item List */}
         <div className="lg:col-span-8 space-y-4">
           {cart.map((item) => (
-            <div key={item.id} className="bg-white p-4 sm:p-5 rounded-2xl border border-gray-100 shadow-soft flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              
+            <div key={item.lineId} className="bg-white p-4 sm:p-5 rounded-2xl border border-gray-100 shadow-soft flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+
               <div className="flex items-center space-x-4">
                 <img
                   src={item.image}
@@ -72,9 +71,12 @@ export default function CartPage() {
                   <Link to={`/products/${item.category_slug}/${item.slug}`} className="font-serif font-bold text-base text-cefi-earth hover:text-cefi-green">
                     {item.name}
                   </Link>
-                  <p className="text-xs text-cefi-gold font-bold mt-1">
-                    {item.is_wholesale_only ? 'Wholesale Quote Item' : `$${item.price.toFixed(2)}`}
-                  </p>
+                  {(item.type || item.size) && (
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      {[item.type, item.size].filter(Boolean).join(' · ')}
+                    </p>
+                  )}
+                  <p className="text-xs text-cefi-gold font-bold mt-1">Quote by quantity, type & size</p>
                 </div>
               </div>
 
@@ -82,30 +84,23 @@ export default function CartPage() {
                 {/* Quantity */}
                 <div className="flex items-center space-x-2 bg-cefi-cream px-3 py-1.5 rounded-full">
                   <button
-                    onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                    onClick={() => updateQuantity(item.lineId, item.quantity - 1)}
                     className="p-1 hover:bg-gray-200 rounded-full"
                   >
                     <Minus className="w-3 h-3 text-gray-600" />
                   </button>
                   <span className="font-bold text-xs w-6 text-center">{item.quantity}</span>
                   <button
-                    onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                    onClick={() => updateQuantity(item.lineId, item.quantity + 1)}
                     className="p-1 hover:bg-gray-200 rounded-full"
                   >
                     <Plus className="w-3 h-3 text-gray-600" />
                   </button>
                 </div>
 
-                {/* Subtotal */}
-                <div className="text-right">
-                  <span className="font-serif font-bold text-base text-cefi-green">
-                    ${(item.price * item.quantity).toFixed(2)}
-                  </span>
-                </div>
-
                 {/* Delete */}
                 <button
-                  onClick={() => removeFromCart(item.id)}
+                  onClick={() => removeFromCart(item.lineId)}
                   className="p-2 text-gray-400 hover:text-red-600 transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -130,25 +125,19 @@ export default function CartPage() {
 
           <div className="space-y-3 text-xs text-gray-600">
             <div className="flex items-center justify-between">
-              <span>Basket Subtotal</span>
-              <span className="font-bold text-cefi-earth">${cartTotal.toFixed(2)}</span>
+              <span>Product Lines</span>
+              <span className="font-bold text-cefi-earth">{cart.length}</span>
             </div>
-            
-            <div className="flex items-center justify-between">
-              <span>Estimated Express Shipping</span>
-              <span className="font-bold text-cefi-earth">
-                {shippingCost === 0 ? <strong className="text-cefi-green font-bold">FREE</strong> : `$${shippingCost.toFixed(2)}`}
-              </span>
-            </div>
-
-            {shippingCost > 0 && (
-              <p className="text-[11px] text-cefi-gold">Add ${(100 - cartTotal).toFixed(2)} more for Free Shipping!</p>
-            )}
 
             <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-sm">
-              <span className="font-bold text-cefi-earth">Estimated Total</span>
-              <span className="font-serif font-bold text-2xl text-cefi-green">${grandTotal.toFixed(2)}</span>
+              <span className="font-bold text-cefi-earth">Total Units</span>
+              <span className="font-serif font-bold text-2xl text-cefi-green">{totalUnits}</span>
             </div>
+
+            <p className="text-[11px] text-gray-500 pt-1">
+              We quote by quantity, type and size — our export team will confirm pricing
+              and shipping cost with you by email after checkout.
+            </p>
           </div>
 
           <button

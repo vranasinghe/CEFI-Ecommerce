@@ -58,11 +58,16 @@ const orderSchema = z.object({
   }).strict(),
   // Prices are NOT accepted from the browser (H-01): only which product and
   // how many. Display fields the cart carries are allowed and discarded.
+  // type/size are the buyer's variant pick (e.g. "Loose Leaf" / "5kg") — this
+  // storefront quotes by quantity, type and size, not a fixed listed price,
+  // so these two travel through to the order record and the emails.
   items: z.array(z.object({
     id: z.union([z.string().max(100), z.number()]).optional(),
     slug: z.string().max(200).optional(),
     name: z.string().max(300).optional(),
     quantity: z.coerce.number().int().min(1).max(10000),
+    type: optionalText(80),
+    size: optionalText(80),
     price: z.any().optional(),
     image: z.any().optional(),
     category_slug: z.any().optional(),

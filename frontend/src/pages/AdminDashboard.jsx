@@ -5,7 +5,7 @@ import {
   Eye, AlertTriangle, LayoutGrid, ShieldCheck, LogOut, CheckCircle2,
   Clock, Globe, Filter, ExternalLink, Sliders, Sparkles, Save, RotateCcw,
   FileText, Image as ImageIcon, BookOpen, Upload, Calendar, ArrowUpRight,
-  X, Check
+  X, Check, Mail
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { authFetch } from '../utils/authFetch';
@@ -117,6 +117,8 @@ export default function AdminDashboard() {
   // Orders Tab Filters
   const [orderSearch, setOrderSearch]       = useState('');
   const [userSearch, setUserSearch]         = useState('');
+  // orderId currently sending its "Order Confirmed" email (disables just that button)
+  const [sendingConfirmationFor, setSendingConfirmationFor] = useState(null);
 
   const [toast, setToast]                   = useState(null);
 
@@ -345,6 +347,26 @@ export default function AdminDashboard() {
       (o.customer?.email || '').toLowerCase().includes(term)
     );
   });
+
+  // Manually (re)sends the "Order Confirmed" email to the buyer. The backend
+  // looks the address up itself from the stored order — nothing customer-
+  // supplied is sent in this request.
+  const handleSendOrderConfirmation = async (orderId) => {
+    setSendingConfirmationFor(orderId);
+    try {
+      const res = await authFetch(`/api/orders/${encodeURIComponent(orderId)}/send-confirmation`, { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        showToast(`Order Confirmed email sent to ${data.sentTo}`);
+      } else {
+        showToast(data.message || 'Could not send the email.', 'error');
+      }
+    } catch {
+      showToast('Network error sending the email.', 'error');
+    } finally {
+      setSendingConfirmationFor(null);
+    }
+  };
 
   // Filtered Users
   const filteredUsers = usersList.filter(u => {
@@ -800,7 +822,7 @@ export default function AdminDashboard() {
                         </div>
                         <div className="text-right">
                           <span className="text-gray-400 block text-[11px]">Total Amount</span>
-                          <span className="font-serif font-bold text-xl text-cefi-green">${ord.total?.toFixed(2)}</span>
+                          <span className="font-serif font-bold text-xl text-cefi-green">${(ord.totalAmount ?? 0).toFixed(2)}</span>
                           <span className="text-gray-500 block text-[11px] mt-0.5">Method: {ord.paymentMethod}</span>
                         </div>
                       </div>
@@ -810,11 +832,24 @@ export default function AdminDashboard() {
                           Ordered Items ({ord.items?.length || 0})
                         </span>
                         {ord.items?.map((item, idx) => (
-                          <div key={idx} className="flex justify-between items-center text-xs">
-                            <span className="text-cefi-earth font-medium">• {item.name} × {item.quantity}</span>
-                            <span className="font-bold text-cefi-green">${(item.price * item.quantity).toFixed(2)}</span>
+                          <div key={idx} className="flex justify-between items-center text-xs gap-2">
+                            <span className="text-cefi-earth font-medium">• {item.name}</span>
+                            <span className="text-gray-500 text-right">
+                              {[item.type, item.size].filter(Boolean).join(' · ') || '—'} · Qty: <strong className="text-cefi-green">{item.quantity}</strong>
+                            </span>
                           </div>
                         ))}
+                      </div>
+
+                      <div className="flex justify-end">
+                        <button
+                          onClick={() => handleSendOrderConfirmation(ord.orderId)}
+                          disabled={sendingConfirmationFor === ord.orderId}
+                          className="flex items-center gap-1.5 px-4 py-2 bg-cefi-green text-white text-xs font-bold rounded-xl hover:bg-cefi-green/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <Mail className="w-3.5 h-3.5" />
+                          {sendingConfirmationFor === ord.orderId ? 'Sending…' : 'Send Order Confirmed Email'}
+                        </button>
                       </div>
                     </div>
                   ))}

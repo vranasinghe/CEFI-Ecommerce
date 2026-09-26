@@ -6,7 +6,8 @@ import { useAuth } from '../context/AuthContext';
 import LoginPromptModal from './LoginPromptModal';
 
 export default function CartDrawer() {
-  const { isCartOpen, setIsCartOpen, cart, updateQuantity, removeFromCart, cartTotal } = useCart();
+  const { isCartOpen, setIsCartOpen, cart, updateQuantity, removeFromCart } = useCart();
+  const totalUnits = cart.reduce((sum, item) => sum + item.quantity, 0);
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loginModalOpen, setLoginModalOpen] = useState(false);
@@ -70,7 +71,7 @@ export default function CartDrawer() {
               </div>
             ) : (
               cart.map((item) => (
-                <div key={item.id} className="flex items-center space-x-4 p-3 bg-cefi-cream/50 rounded-xl border border-gray-100">
+                <div key={item.lineId} className="flex items-center space-x-4 p-3 bg-cefi-cream/50 rounded-xl border border-gray-100">
                   <img
                     src={item.image}
                     alt={item.name}
@@ -78,19 +79,22 @@ export default function CartDrawer() {
                   />
                   <div className="flex-1 min-w-0">
                     <h5 className="text-sm font-semibold text-cefi-earth truncate">{item.name}</h5>
-                    <p className="text-xs text-cefi-gold font-bold mt-0.5">
-                      {item.is_wholesale_only ? 'Wholesale / Quote' : `$${item.price.toFixed(2)}`}
-                    </p>
+                    {(item.type || item.size) && (
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        {[item.type, item.size].filter(Boolean).join(' · ')}
+                      </p>
+                    )}
+                    <p className="text-xs text-cefi-gold font-bold mt-0.5">Quote by quantity, type & size</p>
                     <div className="flex items-center space-x-2 mt-2">
                       <button
-                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                        onClick={() => updateQuantity(item.lineId, item.quantity - 1)}
                         className="p-1 hover:bg-gray-200 rounded border border-gray-200"
                       >
                         <Minus className="w-3 h-3 text-gray-600" />
                       </button>
                       <span className="text-xs font-bold w-6 text-center">{item.quantity}</span>
                       <button
-                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                        onClick={() => updateQuantity(item.lineId, item.quantity + 1)}
                         className="p-1 hover:bg-gray-200 rounded border border-gray-200"
                       >
                         <Plus className="w-3 h-3 text-gray-600" />
@@ -98,7 +102,7 @@ export default function CartDrawer() {
                     </div>
                   </div>
                   <button
-                    onClick={() => removeFromCart(item.id)}
+                    onClick={() => removeFromCart(item.lineId)}
                     className="p-2 text-gray-400 hover:text-red-600 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -112,10 +116,10 @@ export default function CartDrawer() {
           {cart.length > 0 && (
             <div className="p-5 bg-cefi-cream border-t border-gray-200 space-y-3">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Subtotal</span>
-                <span className="font-serif font-bold text-lg text-cefi-green">${cartTotal.toFixed(2)}</span>
+                <span className="text-gray-600">Total Units</span>
+                <span className="font-serif font-bold text-lg text-cefi-green">{totalUnits}</span>
               </div>
-              <p className="text-[11px] text-gray-500">Shipping and taxes calculated at checkout.</p>
+              <p className="text-[11px] text-gray-500">Pricing and shipping cost are confirmed by our export team via email after checkout.</p>
               
               <div className="grid grid-cols-2 gap-2 pt-2">
                 <button

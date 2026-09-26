@@ -83,7 +83,7 @@ export default function CheckoutPage() {
             postalCode: formData.postalCode,
             country: formData.country
           },
-          items: cart.map(({ id, slug, name, quantity }) => ({ id, slug, name, quantity })),
+          items: cart.map(({ id, slug, name, quantity, type, size }) => ({ id, slug, name, quantity, type, size })),
           paymentMethod: formData.paymentMethod || 'Direct Email Order'
         })
       });
@@ -213,7 +213,12 @@ export default function CheckoutPage() {
             <div className="divide-y divide-gray-100 text-xs">
               {orderDetails.items.map((item, idx) => (
                 <div key={idx} className="py-2.5 flex justify-between items-center">
-                  <span className="font-medium text-cefi-earth">• {item.name}</span>
+                  <span className="font-medium text-cefi-earth">
+                    • {item.name}
+                    {(item.type || item.size) && (
+                      <span className="text-gray-500 font-normal"> ({[item.type, item.size].filter(Boolean).join(' · ')})</span>
+                    )}
+                  </span>
                   <span className="font-bold text-cefi-green bg-emerald-50 px-2.5 py-1 rounded-full text-xs">Qty: {item.quantity}</span>
                 </div>
               ))}
@@ -295,11 +300,16 @@ export default function CheckoutPage() {
             <h3 className="font-serif font-bold text-xl text-cefi-earth border-b border-gray-100 pb-3">Order Summary</h3>
             <div className="divide-y divide-gray-100 max-h-72 overflow-y-auto pr-1">
               {cart.map(item => (
-                <div key={item.id} className="py-3 flex items-center justify-between">
+                <div key={item.lineId || item.id} className="py-3 flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     {item.image && <img src={item.image} alt="" className="w-11 h-11 object-cover rounded-lg" />}
                     <div>
                       <p className="text-xs font-semibold text-cefi-earth line-clamp-1">{item.name}</p>
+                      {(item.type || item.size) && (
+                        <span className="text-[11px] text-gray-500 block">
+                          {[item.type, item.size].filter(Boolean).join(' · ')}
+                        </span>
+                      )}
                       <span className="text-[11px] text-gray-500">Qty: {item.quantity}</span>
                     </div>
                   </div>
