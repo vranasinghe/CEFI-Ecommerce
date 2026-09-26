@@ -57,6 +57,17 @@ jobs:
         if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
         run: node scripts/check-secrets.js --range "${{ github.event.before }}..${{ github.sha }}"
 
+  # Fails if a database script is emptied, or the lock-down script loses the
+  # steps that close browser write access (see scripts/check-sql-files.js).
+  sql-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+      - run: node scripts/check-sql-files.js
+
   # Fails the PR / push if a shipped dependency has a known vulnerability of
   # moderate severity or worse (Master-Vault item 66).
   dependency-audit:
