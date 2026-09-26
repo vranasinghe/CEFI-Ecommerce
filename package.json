@@ -11,6 +11,7 @@
     "check-secrets": "node scripts/check-secrets.js --staged"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.3.16",
     "concurrently": "^8.2.2"
   }
 }

@@ -24,3 +24,6 @@ lerna-debug.log*
 # System Files
 .DS_Store
 Thumbs.db
+
+# Encrypted database backups (scripts/backup-db.js) — never commit these
+backups/

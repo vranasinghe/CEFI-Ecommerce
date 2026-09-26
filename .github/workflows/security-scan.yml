@@ -1,0 +1,40 @@
+name: Monthly security scan (OWASP ZAP)
+
+# Scheduled automated penetration test of the live site (Master-Vault item 77).
+# ZAP's *baseline* scan crawls the site and passively inspects every response
+# (headers, cookies, CSP, information leaks, known-vulnerable libraries). It
+# does not attack or submit forms, so it is safe against production.
+# Findings are filed as a GitHub issue ("ZAP security scan report") and the
+# full HTML report is kept as a workflow artifact.
+#
+# This complements, but doesn't replace, a yearly manual test by a human
+# tester (see SECURITY.md → Routine).
+
+on:
+  schedule:
+    - cron: '0 21 1 * *' # 1st of each month, 02:30 Sri Lanka time
+  workflow_dispatch: {}
+  push:
+    branches: [ "main" ]
+    paths: [ ".github/workflows/security-scan.yml", ".zap/rules.tsv" ]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  zap-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ZAP baseline scan of the live site
+        uses: zaproxy/action-baseline@v0.15.0
+        with:
+          target: 'https://cefi-ecommerce.vercel.app'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a -j'   # include alpha passive rules; use the AJAX spider for the React app
+          issue_title: 'ZAP security scan report'
+          allow_issue_writing: true
+          fail_action: false      # report findings as an issue instead of a red build
+          artifact_name: 'zap-baseline-report'
